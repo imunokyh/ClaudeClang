@@ -24,6 +24,7 @@ ClaudeClang — "AI를 이용한 C 코드". 차량 SW를 A-SPICE 절차에 따�
 | `tests/tdd/<모듈>/` | TDD 테스트 (GoogleTest). 단위 테스트와 분리해 별도 결과·별도 커버리지로 낸다 |
 | `tests/unit/<모듈>/` | 단위 테스트 (GoogleTest, SWE.4), `tests/unit/stubs/` 스텁 |
 | `tests/integration/` | 통합 테스트 (GoogleTest, SWE.5), `tests/integration/stubs/` HW·OS 경계 스텁 |
+| `tests/system/` | 시스템 테스트 (GoogleTest, SWE.6). `docs/swe6/test-cases.json`의 TC를 공개 API로 수행한다 |
 | `docs/swe1/` ~ `docs/swe6/` | 단계별 산출물 (한글) |
 | `docs/iterations/` | 이터레이션 계획·결과 (`iter-<n>.md`) |
 | `docs/reviews/` | 단계 리뷰 기록 |
@@ -33,6 +34,7 @@ ClaudeClang — "AI를 이용한 C 코드". 차량 SW를 A-SPICE 절차에 따�
 | `Jenkinsfile` | 사내 Jenkins 파이프라인(같은 검사를 주기적으로 재실행) |
 | `tools/run.sh` | 컨테이너 안에서 빌드·테스트·품질 검사를 실행하는 진입점 (개발과 CI 공용) |
 | `tools/Doxyfile`, `tools/cloc_report.py`, `tools/ci_summary.py` | Doxygen 설정, 주석률·커버리지 요약 |
+| `tools/mutation_check.sh` | 변이 확인: 제품 코드 조건을 바꿔도 단위 테스트가 통과하는지 확인(생존 변이 0) |
 | `.claude/hooks/check-metrics.sh` | 구현이 끝났을 때 Lizard 기준을 검사하는 Stop 훅 |
 | `build/` | 빌드 산출물과 보고서 (`build/reports/`). 커밋하지 않는다 |
 
@@ -267,7 +269,7 @@ docker compose run --rm dev bash              # 컨테이너 셸
 | `docs` / `testdocs` | Doxygen 주석 형식 / 테스트 함수 주석·단언·명세 ID 일치 |
 | `static` / `complexity` / `cloc` | Cppcheck / Lizard(순환 복잡도 10, 함수 80줄) / 주석률 |
 | `unit` / `integration` / `tdd` | 단위(MC/DC) / 통합(함수 커버리지) / TDD(별도 보고) |
-| `trace` / `system` | 양방향 추적성 / SWE.6 요구사항 커버리지 |
+| `trace` / `system` | 양방향 추적성 / SWE.6 요구사항 커버리지와 `tests/system` 실행(성공률 100%) |
 | `all` | 위 전부(`hitl-reviewed` 제외). PR 전에 실행 |
 
 소스나 해당 산출물이 아직 없으면 그 검사는 "건너뜀"을 출력하고 통과한다(문서만 있는 단계). 보고서는 `build/reports/`(HTML 커버리지 `unit|integration|tdd/html/index.html`, Cppcheck `cppcheck-html/`, Doxygen `doxygen/html/` 등)에 생긴다.

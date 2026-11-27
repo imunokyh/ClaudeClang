@@ -10,3 +10,4 @@ AllowShortBlocksOnASingleLine: Never
 InsertBraces: true
 PointerAlignment: Right
 SortIncludes: true
+IndentExternBlock: NoIndent
