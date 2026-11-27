@@ -20,12 +20,18 @@ MUTANTS=(
     "src/input_guard/input_guard.c|(raw->value <= SPEED_MAX_KPH)|(raw->value < SPEED_MAX_KPH)|차속 상한 경계(300.0)"
     "src/input_guard/input_guard.c|(raw->value == 1.0)|(raw->value == 2.0)|boolean 값 1"
     "src/input_guard/input_guard.c|guard->invalid[index] = !acceptable;|guard->invalid[index] = false;|무효 항목 표시 생략"
-    "src/arbiter/arbiter.c|has_item_value(inputs, ITEM_SENSOR_FAULT, SENSOR_FAULT_TRUE))|has_item_value(inputs, ITEM_ISOFIX_LEFT, SENSOR_FAULT_TRUE))|규칙 2의 입력 항목"
+    "src/arbiter/arbiter.c|else if (has_item_value(inputs, ITEM_SENSOR_FAULT, BOOL_TRUE))|else if (has_item_value(inputs, ITEM_ISOFIX_LEFT, BOOL_TRUE))|규칙 2의 입력 항목"
     "src/arbiter/arbiter.c|(inputs->validity[item] == VALIDITY_VALID)|(inputs->validity[item] != VALIDITY_VALID)|입력 상태 VALID 조건"
     "src/arbiter/arbiter.c|if (fault_condition)|if (fault_condition && degraded_condition)|state 결정(FAULT 조건 단독)"
     "src/lock_ctrl/lock_ctrl.c|(now_ms < ctrl->last_now_ms)|(now_ms <= ctrl->last_now_ms)|평가 시각 역행 경계(같은 시각 허용)"
     "src/lock_ctrl/lock_ctrl.c|(input->command != NULL)|(input->command == NULL)|명령 검사 호출 조건"
     "src/lock_ctrl/lock_ctrl.c|ctrl->outputs = decision.outputs;|ctrl->outputs = ctrl->outputs;|직전 확정 출력 갱신 생략"
+    "src/arbiter/arbiter.c|<= APPROACH_WINDOW_MS|< APPROACH_WINDOW_MS|override 창 경계(10,000 ms 포함)"
+    "src/arbiter/arbiter.c|inputs->value[ITEM_VEHICLE_SPEED] >= threshold|inputs->value[ITEM_VEHICLE_SPEED] > threshold|자동 잠금 경계(3.0 km/h 포함)"
+    "src/arbiter/arbiter.c|(side == SIDE_ALL)|(side == 7)|명령 side all"
+    "src/arbiter/arbiter.c|else if (!current.override_active)|else if (current.override_active)|override 성립 문의 접근위험 규칙"
+    "src/arbiter/arbiter.c|result = step.overridden|result = !step.overridden|override 이유"
+    "src/arbiter/arbiter.c|else if (has_item_value(inputs, ITEM_IGNITION_ON, BOOL_FALSE))|else if (has_item_value(inputs, ITEM_IGNITION_ON, BOOL_TRUE))|ignition off 규칙"
 )
 
 killed=0
