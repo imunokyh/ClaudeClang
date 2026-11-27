@@ -1,6 +1,6 @@
 # SW 요구사항 명세
 
-- 대상 SW: 전자식 차일드락 제어 SW (후석 좌, 우)   버전: 0.5 (이터레이션 1)   일자: 2026-11-27
+- 대상 SW: 전자식 차일드락 제어 SW (후석 좌, 우)   버전: 0.6 (이터레이션 1~2)   일자: 2026-11-27
 - 입력 문서: OEM-SWR-001 OEM SW 요구사항 사양서, Rev 1.0, 베이스라인 BL-OEM-1.0 (`OEM/OEM-SWR-001_OEM SW 요구사항 사양서.docx`)
 - ISO 25010 적용 판: 2023
 - 안전 요구사항: [safety-requirements.md](safety-requirements.md)
@@ -21,7 +21,9 @@
 | OEM-IF-004 | 포함: 운전자 명령의 검사와 거절(SWR-033). 명령의 적용은 이터레이션 3 |
 | OEM-IF-005 | 포함: 출력 lock_left, lock_right의 값 정의(SWR-007). 적용 feedback은 OEM이 범위 밖으로 정함 |
 | OEM-IF-006 | 이터레이션 3 (OEM-FR-004). 이터레이션 1은 state, priority_reason, reason_code, input_validity 값을 만들어 두기만 하고 표시 형식·직렬화는 다루지 않는다 |
-| OEM-SR-002, FR-001~007, NFR-001~002 | 이터레이션 2~4. 다만 초기 상태(SWR-025), OEM-NFR-001 중 시계 입력(SWR-032)과 난수 금지(SWR-047)는 이터레이션 1이 선행한다 |
+| OEM-SR-002, OEM-FR-002, FR-003, FR-005, FR-006, FR-007 | 이터레이션 2: 접근위험 잠금과 억제·override(SWR-005, 006, 009, 048), 자동 잠금(SWR-003), 화재·과온·성인 해제(SWR-017), ISOFIX 잠금(SWR-018), ignition off(SWR-020) |
+| OEM-FR-001 (명령 적용) | 이터레이션 2: 운전자 명령의 적용(SWR-001, 002). 접근위험 억제·override의 전제이므로 이터레이션 3에서 앞당겼다. 일반 해제 허용 조건(SWR-004)은 이터레이션 3 |
+| OEM-FR-004, NFR-001, NFR-002 | 이터레이션 3~4. 다만 초기 상태(SWR-025), OEM-NFR-001 중 시계 입력(SWR-032)과 난수 금지(SWR-047)는 이터레이션 1이 선행했다 |
 
 ### 0.2 용어
 
@@ -49,20 +51,30 @@
 |---|---|---|---|---|---|---|
 | SWR-007 | 기능 | SW는 crash_status의 입력 상태가 VALID이고 판정 값이 CONFIRMED이면 lock_left와 lock_right를 RELEASE로 확정하고 결정 이유를 CRASH_CONFIRMED로 한다(SWR-023 규칙 1). | 입력 crash_status {NONE, PENDING, CONFIRMED} / 출력 lock_left, lock_right {LOCK, RELEASE} | 직전 확정 출력을 LOCK으로 설정(SWR-039)하고 CONFIRMED 스냅샷을 평가하면 두 출력이 RELEASE. sensor_fault=TRUE이거나 다른 입력 항목이 INVALID여도 RELEASE | OEM-SR-001, OEM-IF-002, OEM-IF-005, 가정 A-04, 질의 Q-17 | SAF-001 |
 | SWR-008 | 기능 | SW는 crash_status가 입력 상태 VALID로 CONFIRMED인 상태로 유지되는 동안 매 평가마다 SWR-007을 적용해 두 출력을 RELEASE로 확정한다. | 입력 crash_status / 출력 lock_left, lock_right | CONFIRMED를 담은 스냅샷을 10 ms 간격으로 100번 평가하면 매번 두 출력이 RELEASE. 스냅샷이 200 ms를 넘게 오지 않아 모든 입력이 STALE이 되면 RELEASE를 적용하지 않고 SWR-024가 적용된다 | OEM-SR-001 | SAF-001 |
-| SWR-036 | 기능 | SW는 crash_status의 입력 상태가 VALID이고 판정 값이 PENDING이면 이를 출력 결정에 쓰지 않고, 더 높은 순위의 규칙이 없을 때 결정 이유를 CRASH_PENDING으로 한다(SWR-023 규칙 6). | 입력 crash_status / 출력 lock_left, lock_right, reason_code | 직전 확정 출력을 LOCK으로 설정하고 PENDING 스냅샷을 평가하면 출력이 LOCK 그대로이고 reason_code=CRASH_PENDING. PENDING과 sensor_fault=TRUE가 같이 있으면 reason_code=SENSOR_FAULT | OEM-SR-001, 가정 A-10 | SAF-001 |
+| SWR-036 | 기능 | SW는 crash_status의 입력 상태가 VALID이고 판정 값이 PENDING이면 이를 출력 결정에 쓰지 않고, 더 높은 순위의 규칙이 없을 때 결정 이유를 CRASH_PENDING으로 한다(SWR-023 규칙 13). | 입력 crash_status / 출력 lock_left, lock_right, reason_code | 직전 확정 출력을 LOCK으로 설정하고 PENDING 스냅샷을 평가하면 출력이 LOCK 그대로이고 reason_code=CRASH_PENDING. PENDING과 sensor_fault=TRUE가 같이 있으면 reason_code=SENSOR_FAULT | OEM-SR-001, 가정 A-10 | SAF-001 |
 | SWR-013 | 기능 | SW는 받아들인 스냅샷이 아직 없거나 now_ms − 마지막 수신 시각이 200 ms를 초과하면, INVALID가 아닌 모든 입력 항목의 input_validity를 STALE로 표시한다. 이때 DEGRADED 조건이 성립한다. | 입력 now_ms, 마지막 수신 시각 (ms) / 출력 input_validity | now_ms − 마지막 수신 시각 = 200 ms인 평가는 VALID, 210 ms인 평가는 STALE. 초기화 후 스냅샷 없이 평가하면 모든 입력 항목이 STALE, state=DEGRADED, reason_code=INPUT_STALE, 출력은 초기 출력 그대로 | OEM-SR-003, 가정 A-07 | SAF-003 |
 | SWR-021 | 기능 | SW는 sensor_fault의 입력 상태가 VALID이고 판정 값이 TRUE이면 warning_code를 SENSOR_FAULT로 내고 결정 이유를 SENSOR_FAULT로 하며 새 명령을 적용하지 않고 직전 확정 출력을 유지한다(SWR-023 규칙 2). 그 밖에는 warning_code를 NONE으로 낸다. 충돌 해제(규칙 1)가 성립하면 출력은 규칙 1이 정한다. | 입력 sensor_fault boolean / 출력 lock_left, lock_right, warning_code | 직전 확정 출력을 LOCK으로 설정하고 sensor_fault=TRUE를 평가하면 출력 LOCK 그대로, warning_code=SENSOR_FAULT, reason_code=SENSOR_FAULT. 같은 평가에 충돌 CONFIRMED(VALID)이면 출력은 RELEASE이고 warning_code=SENSOR_FAULT는 유지. sensor_fault=FALSE 평가에서, 또는 sensor_fault 입력 상태가 INVALID·STALE인 평가에서 warning_code=NONE | OEM-SR-004, OEM-IF-009, 가정 A-03 | SAF-004 |
 | SWR-022 | 기능 | SW는 받아들인 스냅샷의 모든 차량 입력(timestamp_ms 제외)을 5.1절 규칙으로 검사하고, 누락, 형식 오류, 범위 오류, 미정 enum 값인 입력을 INVALID로 정해 input_validity에 표시하며, 그 값을 판정 값으로 쓰지 않고 갱신으로 치지 않는다(보관 값 불변). | 5.1절 입력 검사 규칙 / 출력 input_validity {VALID, INVALID, STALE} | 항목별 경계값 직전·직후 주입: 범위 안 VALID, 범위 밖 INVALID. INVALID 평가 후 보관 값이 평가 전과 같다. INVALID가 된 입력은 이후 스냅샷이 없는 평가에서도 INVALID이고, 유효한 값이 갱신된 평가에서 풀린다 | OEM-SR-003, OEM-IF-001, OEM-IF-002, OEM-IF-003, OEM-IF-007, OEM-IF-008, OEM-IF-009 | SAF-005 |
 | SWR-034 | 기능 | SW는 차량 입력 중 입력 상태가 INVALID인 것이 하나라도 있고 규칙 1, 2가 성립하지 않으면 새 명령을 적용하지 않고 직전 확정 출력을 유지하며 결정 이유를 INPUT_INVALID로 한다(SWR-023 규칙 3). 이때 DEGRADED 조건이 성립한다. | 입력 input_validity / 출력 lock_left, lock_right, reason_code | 직전 확정 출력 LOCK에서 입력 하나를 범위 밖으로 주입하면 출력 LOCK 그대로, reason_code=INPUT_INVALID, 그 입력의 input_validity=INVALID, state=DEGRADED. 그 뒤 스냅샷 없이 평가해도 계속 INPUT_INVALID, 유효한 값을 갱신한 평가에서 INVALID가 풀린다 | OEM-SR-003, 가정 A-04 | SAF-005 |
 | SWR-024 | 기능 | SW는 차량 입력 중 입력 상태가 STALE인 것이 하나라도 있고 규칙 1~3이 성립하지 않으면 새 명령을 적용하지 않고 직전 확정 출력을 유지하며 결정 이유를 INPUT_STALE로 한다(SWR-023 규칙 4). | 입력 전체 / 출력 lock_left, lock_right, reason_code | 직전 확정 출력 LOCK에서 스냅샷을 200 ms 넘게 받지 못해 모든 입력이 STALE이면 출력 LOCK 그대로, reason_code=INPUT_STALE. crash_status 입력이 STALE이면 CONFIRMED 보관 값이 있어도 RELEASE를 적용하지 않는다 | OEM-SR-003, 가정 A-04 | SAF-003 |
-| SWR-035 | 기능 | SW는 평가마다 state를 다시 정한다: FAULT 조건이 성립하면 FAULT, 아니면 DEGRADED 조건이 성립하면 DEGRADED, 아니면 NORMAL. 원인이 없어진 평가(예: INVALID 입력 항목에 유효한 값이 갱신된 평가)에서 NORMAL이 되며 원인이 남아 있는 한 state를 유지한다. sensor_fault의 입력 상태가 INVALID나 STALE이면 FAULT가 아니라 DEGRADED다. | 입력 input_validity, sensor_fault / 출력 state {NORMAL, DEGRADED, FAULT, OFF} | 새 스냅샷이 도착해 STALE이 풀린 평가에서 state=NORMAL. FAULT 조건과 DEGRADED 조건(다른 입력 항목 INVALID) 동시이면 FAULT. sensor_fault 입력 항목이 INVALID이면 DEGRADED. 이터레이션 1에서 OFF는 쓰지 않는다(OEM-FR-007, 이터레이션 2) | OEM-SR-003, OEM-SR-004, 가정 A-08, 가정 A-15, 질의 Q-20 | SAF-003, SAF-004, SAF-005 |
-| SWR-023 | 기능 | SW는 출력과 결정 이유를 5.4절 결정 규칙표의 규칙 중 처음 성립한 것으로 정한다. 규칙 2~7은 직전 확정 출력을 바꾸지 않는다(이터레이션 1). | 입력 전체 / 출력 lock_left, lock_right, reason_code, priority_reason | 규칙 조합 시험: 1과 2 동시 → RELEASE, CRASH_CONFIRMED. 2와 3 동시 → 유지, SENSOR_FAULT. 3과 4 동시 → INPUT_INVALID. 6만 성립 → CRASH_PENDING. 어느 규칙도 성립하지 않음 → NONE | OEM-SR-001, OEM-SR-004, 가정 A-03 | SAF-001, SAF-004 |
+| SWR-035 | 기능 | SW는 평가마다 state를 다시 정한다: FAULT 조건이 성립하면 FAULT, 아니면 DEGRADED 조건이 성립하면 DEGRADED, 아니면 ignition_on의 입력 상태가 VALID이고 판정 값이 FALSE이면 OFF, 아니면 NORMAL. 원인이 없어진 평가(예: INVALID 입력 항목에 유효한 값이 갱신된 평가)에서 NORMAL이 되며 원인이 남아 있는 한 state를 유지한다. sensor_fault의 입력 상태가 INVALID나 STALE이면 FAULT가 아니라 DEGRADED다. | 입력 input_validity, sensor_fault, ignition_on / 출력 state {NORMAL, DEGRADED, FAULT, OFF} | 새 스냅샷이 도착해 STALE이 풀린 평가에서 state=NORMAL. FAULT 조건과 DEGRADED 조건(다른 입력 항목 INVALID) 동시이면 FAULT. sensor_fault 입력 항목이 INVALID이면 DEGRADED. ignition_on=FALSE(VALID)이고 다른 조건이 없으면 OFF, ignition_on=FALSE와 INVALID 항목이 동시이면 DEGRADED | OEM-SR-003, OEM-SR-004, OEM-FR-007, 가정 A-08, 가정 A-15, 질의 Q-20 | SAF-003, SAF-004, SAF-005 |
+| SWR-023 | 기능 | SW는 출력과 결정 이유를 5.4절의 규칙 중 처음 성립한 것으로 정한다. 먼저 전역 규칙(1~8)을 위에서부터 평가하고, 어느 것도 성립하지 않으면 문(좌, 우)마다 문 규칙(9~12)을 평가한다. 문 규칙이 하나도 성립하지 않으면 규칙 13, 14로 결정 이유만 정한다. 전역 규칙 2~4는 직전 확정 출력을 바꾸지 않는다. | 입력 전체 / 출력 lock_left, lock_right, reason_code, priority_reason | 규칙 조합 시험: 1과 2 동시 → RELEASE, CRASH_CONFIRMED. 2와 3 동시 → 유지, SENSOR_FAULT. 3과 4 동시 → INPUT_INVALID. 4와 5 동시 → 유지, INPUT_STALE. 5와 6 동시 → IGNITION_OFF. 6, 7, 8 동시 → FIRE. 8과 9 동시 → RELEASE, ADULT_PRESENT. 9, 10, 11, 12 동시 → 해당 문 LOCK, APPROACH_RISK. 어느 규칙도 성립하지 않음 → NONE | OEM-SR-001, OEM-SR-004, OEM-SR-002, 가정 A-03, 가정 A-16 | SAF-001, SAF-002, SAF-004 |
 | SWR-044 | 기능 | SW는 평가마다 ① now_ms 검사(SWR-040, 거절되면 ② 이후를 수행하지 않는다) ② 스냅샷(timestamp_ms 포함)·운전자 명령 검사와 입력 상태 계산 ③ state 결정(SWR-035) ④ 출력·결정 이유 결정(SWR-023) 순서로 수행하고, ②의 결과를 같은 평가의 ③, ④에 쓴다. | 입력 now_ms, 스냅샷, 운전자 명령 / 출력 전체 | 범위 밖 입력을 담은 스냅샷을 평가한 그 평가의 출력에서 INVALID가 이미 반영되어 있다(다음 평가가 아니라) | OEM-SR-003, OEM-SR-001 | SAF-003, SAF-005 |
-| SWR-025 | 기능 | SW는 초기화 직후(첫 평가 전)의 출력을 다음 값으로 둔다: lock_left, lock_right와 직전 확정 출력은 초기 출력 지정값(SWR-039, 지정하지 않으면 RELEASE), state는 NORMAL(평가 전 초기값이며 첫 평가에서 SWR-035가 정한다), input_validity는 입력마다 STALE, reason_code와 priority_reason과 warning_code는 NONE, command_status는 NONE. | 출력 전체 | 지정 없이 초기화한 직후 조회: RELEASE, RELEASE, NORMAL, 모든 input_validity=STALE, NONE, NONE, NONE, NONE | OEM-FR-007(초기 해제 상태에 한함), 가정 A-05 | SAF-004 |
+| SWR-025 | 기능 | SW는 초기화 직후(첫 평가 전)의 출력을 다음 값으로 둔다: lock_left, lock_right와 직전 확정 출력은 초기 출력 지정값(SWR-039, 지정하지 않으면 RELEASE), state는 NORMAL(평가 전 초기값이며 첫 평가에서 SWR-035가 정한다), input_validity는 입력마다 STALE, reason_code와 priority_reason과 warning_code는 NONE, command_status는 NONE, 도어별 override 상태는 FALSE, 도어별 억제 기록은 없음. | 출력 전체 | 지정 없이 초기화한 직후 조회: RELEASE, RELEASE, NORMAL, 모든 input_validity=STALE, NONE, NONE, NONE, NONE, override FALSE, FALSE | OEM-FR-007(초기 해제 상태에 한함), 가정 A-05 | SAF-004 |
 | SWR-039 | 기능 | SW는 초기화할 때 초기 출력(lock_left, lock_right의 초기값이자 직전 확정 출력)을 호출자가 지정할 수 있어야 한다(시험 지원. 이터레이션 1에는 LOCK을 내는 요구가 없어 유지 동작 검증에 필요하다). | 입력 초기 출력 {LOCK, RELEASE} / 출력 lock_left, lock_right | 초기 출력을 LOCK으로 지정해 초기화한 직후 조회하면 lock_left=LOCK, lock_right=LOCK | 가정 A-13 | |
 | SWR-040 | 기능 | SW는 now_ms가 5.1절 검사에 실패하면(직전에 받아들여진 평가의 now_ms보다 작은 경우 포함) 그 평가를 거절하고 반환 상태 STATUS_ERR_TIME을 반환한다. 받아들여진 평가는 STATUS_OK를 반환한다(SWR-046의 스냅샷 거절 평가 포함). 거절된 평가는 없었던 것으로 본다: 함께 들어온 스냅샷과 운전자 명령은 버리고, 5.3절의 모든 출력, 입력 상태, 보관 값, 갱신 시각, 직전 확정 출력, "직전 평가"의 now_ms를 바꾸지 않는다. | 입력 now_ms (ms) / 출력 반환 상태 {STATUS_OK, STATUS_ERR_TIME} | 평가 100 ms → 50 ms(거절) → 80 ms 순서로 호출하면 두 번째는 STATUS_ERR_TIME을 반환하고 출력 전체가 첫 평가 직후 값과 같다. 두 번째에 함께 넣은 스냅샷·명령은 반영되지 않는다. 세 번째도 직전에 받아들여진 평가(첫 번째)의 now_ms 100 ms보다 작으므로 거절된다 | OEM-SR-003, 가정 A-02 | SAF-003 |
 | SWR-046 | 기능 | SW는 스냅샷의 timestamp_ms가 5.1절 검사에 실패하면(누락, 형식 오류, 범위 오류, 직전에 받아들인 스냅샷보다 작음, now_ms보다 큼) 그 스냅샷을 거절하고, 그 스냅샷에 담긴 모든 입력 항목의 입력 상태를 INVALID로 하며 보관 값을 바꾸지 않는다. 반환 상태는 STATUS_OK다. | 입력 timestamp_ms / 출력 input_validity | timestamp_ms 역행, 미래 시각(now_ms 초과), 누락을 각각 주입하면 모든 차량 입력의 input_validity=INVALID, state=DEGRADED, 출력이 직전 확정 출력과 같고, 다음 받아들인 스냅샷에서 유효한 값으로 풀린다 | OEM-SR-003, OEM-IF-001, 가정 A-11 | SAF-005 |
 | SWR-033 | 기능 | SW는 운전자 명령(OEM-IF-004)의 side, action, source 중 누락이거나 5.2절의 값 집합 밖인 것이 있으면 그 명령을 거절하고 command_status를 REJECTED로 하며, 유효하면 command_status를 ACCEPTED로 한다(이터레이션 1에서는 어느 쪽도 출력과 state를 바꾸지 않는다). 명령이 없는 평가는 command_status를 NONE으로 한다. | 입력 side {left, right, all}, action {lock, unlock}, source {physical_button, avn, voice, mobile_app} / 출력 command_status {NONE, ACCEPTED, REJECTED} | 필드별 누락, 미등록 값, 형식 오류 주입 → REJECTED. 모두 유효 → ACCEPTED. 명령 없음 → NONE. 세 경우 모두 출력·state 불변 | OEM-IF-004 | |
+| SWR-020 | 기능 | SW는 규칙 1~4가 성립하지 않고 ignition_on의 입력 상태가 VALID이며 판정 값이 FALSE이면 lock_left와 lock_right를 RELEASE로 확정하고 결정 이유를 IGNITION_OFF로 한다(SWR-023 규칙 5). state는 SWR-035가 정한다(다른 조건이 없으면 OFF). | 입력 ignition_on boolean / 출력 lock_left, lock_right, state, reason_code | 초기 출력 LOCK에서 ignition_on=FALSE인 첫 평가에 두 출력 RELEASE, state=OFF, reason=IGNITION_OFF. ignition_on=TRUE로 바뀐 평가에서 출력은 직전 확정 출력(RELEASE)을 유지하고 state=NORMAL | OEM-FR-007, 가정 A-17 | |
+| SWR-017 | 기능 | SW는 규칙 1~5가 성립하지 않고 fire_detected, overtemperature_detected, adult_present 중 하나라도 입력 상태 VALID이며 판정 값이 TRUE이면 lock_left와 lock_right를 RELEASE로 확정하고 결정 이유를 입력별로 FIRE, OVERTEMPERATURE, ADULT_PRESENT로 한다. 둘 이상이 동시이면 이 순서로 앞선 것을 이유로 한다(SWR-023 규칙 6, 7, 8). | 입력 fire_detected, overtemperature_detected, adult_present boolean / 출력 lock_left, lock_right, reason_code | 초기 출력 LOCK에서 각 입력을 단독으로 TRUE로 주입한 첫 평가에 두 출력 RELEASE이고 reason이 각각 FIRE, OVERTEMPERATURE, ADULT_PRESENT. 세 입력 동시이면 FIRE. 해당 입력이 INVALID이면 적용하지 않는다 | OEM-FR-005, 가정 A-18 | |
+| SWR-005 | 기능 | SW는 전역 규칙 1~8이 성립하지 않을 때, 후측방 접근위험 입력(rear_left_approach_risk, rear_right_approach_risk)의 입력 상태가 VALID이고 판정 값이 TRUE이며 그 문의 override가 성립하지 않았으면 그 문의 출력을 LOCK으로 확정하고 결정 이유를 APPROACH_RISK로 한다. 그 문에 대한 해제 요청(운전자 명령 unlock)은 이 규칙이 우선하므로 출력을 바꾸지 않는다(SWR-023 규칙 9). | 입력 rear_left_approach_risk, rear_right_approach_risk boolean, 운전자 명령 / 출력 lock_left, lock_right, reason_code | 초기 출력 RELEASE에서 좌 접근위험 TRUE인 첫 평가에 lock_left=LOCK이고 reason=APPROACH_RISK. 이후 좌 대상 unlock 명령을 평가해도 lock_left=LOCK 유지. 접근위험이 FALSE로 풀린 뒤에는 이 규칙이 적용되지 않는다 | OEM-SR-002, OEM-IF-003 | SAF-002 |
+| SWR-009 | 기능 | SW는 좌, 우 문을 독립으로 판정한다. 한쪽 문의 접근위험, ISOFIX, override는 다른 쪽 문의 출력과 override 상태에 영향을 주지 않는다. | 문 규칙 9~12의 입력 / 출력 lock_left, lock_right | 좌 접근위험 TRUE, 우 접근위험 FALSE, 초기 RELEASE에서 우 대상 unlock 명령이 있어도 lock_left=LOCK, lock_right=RELEASE. 좌 override가 성립해도 우의 억제 기록은 변하지 않는다 | OEM-SR-002 | SAF-002 |
+| SWR-048 | 기능 | SW는 접근위험 규칙(규칙 9)이 적용되는 문에 대해 해제 요청이 들어오면 처음 억제된 시각(now_ms)과 억제 기록을 문마다 남긴다. 억제 기록은 접근위험 입력이 VALID로 FALSE가 되면 지운다. 억제 기록이 있고 같은 문에 대한 해제 요청이 처음 억제된 시각부터 10,000 ms 이하 경과 후 들어오면 SWR-006의 override로 처리하고, 10,000 ms를 초과해 들어오면 그 요청을 새 첫 억제로 보고 기록의 시각을 갱신한다. | 입력 now_ms, 운전자 명령(unlock) / 출력 문별 억제 기록 | 접근위험 TRUE에서 unlock 명령을 0 ms에 평가(억제 기록 생성), 10,000 ms에 같은 명령(경과 10,000 ms) → override. 다른 시험에서 10,001 ms에 같은 명령(경과 10,001 ms) → override 아님, 기록 시각이 10,001 ms로 갱신됨 | OEM-FR-003, 가정 A-19, 가정 A-20 | SAF-002 |
+| SWR-006 | 기능 | SW는 SWR-048의 억제 기록이 있는 문에 대해 10,000 ms 이하 경과 후 같은 문을 대상으로 하는 해제 요청(운전자 명령 unlock, side가 그 문 또는 all)이 다시 들어오면 그 문의 override를 성립시키고 억제 기록을 지우며 그 평가의 결정 이유를 APPROACH_OVERRIDE로 한다. override가 성립한 문에는 접근위험 규칙(규칙 9)을 적용하지 않고 문 규칙 10~12로 정한다. override는 그 문의 접근위험 입력이 VALID로 FALSE가 될 때까지 유지된다. | 입력 운전자 명령, now_ms / 출력 override_left, override_right, reason_code | 접근위험 TRUE(좌)에서 좌 unlock 명령 두 번(10,000 ms 이내) → 두 번째 평가에서 override_left=TRUE, lock_left=RELEASE, reason=APPROACH_OVERRIDE. 이후 평가(접근위험 TRUE 유지)에서도 override_left=TRUE이고 lock_left는 RELEASE 유지. 접근위험이 FALSE로 풀린 평가에서 override_left=FALSE | OEM-SR-002, OEM-FR-003, 가정 A-19 | SAF-002 |
+| SWR-018 | 기능 | SW는 전역 규칙 1~8이 성립하지 않고 문에 접근위험 규칙(규칙 9)이 적용되지 않을 때, isofix_left(isofix_right)의 입력 상태가 VALID이고 판정 값이 TRUE이면 좌(우) 문의 출력을 LOCK으로 확정하고 결정 이유를 ISOFIX로 한다. 반대쪽 문의 출력은 이 규칙으로 바꾸지 않는다(SWR-023 규칙 10). | 입력 isofix_left, isofix_right boolean / 출력 lock_left, lock_right, reason_code | 초기 RELEASE에서 isofix_left만 TRUE인 첫 평가에 lock_left=LOCK, lock_right=RELEASE 유지, reason=ISOFIX. isofix_left가 FALSE로 돌아와도 lock_left는 직전 확정 출력(LOCK) 유지 | OEM-FR-006 | |
+| SWR-003 | 기능 | SW는 전역 규칙 1~8이 성립하지 않고 문에 규칙 9, 10이 적용되지 않을 때, vehicle_speed_kph의 입력 상태가 VALID이고 판정 값이 3.0 km/h(30) 이상이면 그 문의 출력을 LOCK으로 확정하고 결정 이유를 AUTO_LOCK으로 한다(SWR-023 규칙 11). | 입력 vehicle_speed_kph(0.1 km/h 단위 정수) / 출력 lock_left, lock_right, reason_code | 초기 RELEASE에서 차속 2.9 km/h(29) 평가는 RELEASE 유지, 3.0 km/h(30)인 첫 평가에 두 출력 LOCK이고 reason=AUTO_LOCK. 차속이 다시 내려가도 출력은 LOCK 유지 | OEM-FR-002 | |
+| SWR-001 | 기능 | SW는 전역 규칙 1~8이 성립하지 않을 때, 그 평가에서 받은 유효한 운전자 명령(command_status=ACCEPTED)을 문 규칙 12로 적용한다: action이 lock이면 대상 문(side가 left, right이면 그 문, all이면 두 문)을 LOCK으로, unlock이면 RELEASE로 확정하고 결정 이유를 DRIVER_COMMAND로 한다. 문 규칙 9, 10, 11이 적용되는 문에는 적용하지 않는다. 명령은 그 평가에서만 처리하는 일회성 사건이며 다음 평가로 이어지지 않는다. | 입력 운전자 명령(side, action, source) / 출력 lock_left, lock_right, reason_code | 접근위험·ISOFIX 없음, 차속 0, 초기 LOCK에서 (all, unlock)을 평가하면 두 출력 RELEASE, reason=DRIVER_COMMAND. (left, lock)이면 lock_left만 LOCK. 전역 규칙이 성립하는 평가(예: sensor_fault TRUE)의 명령은 적용되지 않는다 | OEM-FR-001, 가정 A-16 | |
+| SWR-002 | 기능 | SW는 운전자 명령의 source(physical_button, avn, voice, mobile_app)에 따라 처리 결과를 다르게 하지 않는다. 등록된 네 값은 모두 같은 방식으로 SWR-001을 적용한다. | 입력 source / 출력 lock_left, lock_right | 같은 (side, action)에 대해 source 네 값 각각의 평가 결과(출력, 결정 이유)가 서로 같다 | OEM-FR-001 | |
 
 ## 2. 비기능 요구사항
 
@@ -126,6 +138,9 @@
 | Q-18 | source_timestamp_ms의 용도 | OEM-IF-001의 source_timestamp_ms로 차속 freshness를 잴지 여부 | 열림 | 가정 A-11: 검사만 하고 freshness에는 쓰지 않음 |
 | Q-20 | FAULT와 DEGRADED 동시 | OEM-SR-003 수용기준은 "DEGRADED 상태"인데 sensor_fault 입력이 유효한 TRUE이고 다른 입력 항목이 INVALID일 때 FAULT를 보고하면 문구와 다르다 | 열림 | 가정 A-15 적용 |
 | Q-19 | 입력의 C 표현 | 누락·형식 오류를 C에서 어떻게 표현할지 OEM 계약이 없다 | 열림 | 가정 A-12 적용 |
+| Q-21 | 우선순위(이터레이션 2) | 화재·과온·성인 해제(QM)와 접근위험 잠금(ASIL B)이 동시일 때, ISOFIX 잠금과 화재 해제가 동시일 때, ignition off와 충돌 동시일 때의 순위가 OEM 문서에 없다 | 열림 | 가정 A-03, A-17, A-18 적용(해제 계열이 우선) |
+| Q-22 | override와 안전 요구의 관계 | OEM-SR-002(ASIL B, 접근위험 문은 LOCK을 유지)와 OEM-FR-003(QM, 재입력은 명시적 override)이 충돌한다. override 때 문을 해제하는지, 상태·이유만 기록하는지 문서에 없다 | 열림 | 가정 A-19: 해제한다(문 규칙 12) |
+| Q-23 | 명령 지속 | 운전자 명령이 일회성 사건인지, 입력이 유지되는 동안 유효한지 정의가 없다 | 열림 | 가정 A-16: 일회성 |
 
 ## 4. 가정
 
@@ -146,6 +161,12 @@
 | A-14 | 스냅샷 도착 주기 | 스냅샷은 보통 평가 주기(10 ms)마다 오지만 요구는 이에 의존하지 않는다. 스냅샷이 없는 평가는 입력 상태 정의(0.2절)의 STALE·INVALID 규칙을 따른다 | 도착 주기가 OEM 문서에 없음(Q-01과 함께 확인) |
 | A-15 | FAULT와 DEGRADED 동시 | FAULT 조건과 DEGRADED 조건이 동시에 성립하면(sensor_fault가 유효한 TRUE이고 다른 입력 항목이 INVALID) state는 FAULT다. STALE일 때는 sensor_fault 입력도 STALE이라 FAULT 조건이 성립하지 않으므로 FAULT와 STALE의 동시는 없다. OEM-SR-003의 "DEGRADED 상태"는 DEGRADED 조건 성립으로 읽고, FAULT가 더 심각한 상태로서 이를 포함한다고 본다 | 둘 다 직전 확정 출력을 유지하며 FAULT가 더 심각. Q-20으로 확인 |
 | A-13 | 시험 지원 | 초기 출력 지정(SWR-039)은 시험 목적이며 제품 동작에서는 기본값 RELEASE를 쓴다 | LOCK을 내는 요구가 이터레이션 2부터라 이터레이션 1 시험에 필요 |
+| A-16 | 우선순위와 명령 | 이터레이션 2의 순위는 전역 규칙 1~8(충돌 > sensor_fault > INVALID > STALE > ignition off > 화재 > 과온 > 성인) 다음에 문 규칙 9~12(접근위험 > ISOFIX > 자동 잠금 > 운전자 명령)다. 운전자 명령은 그 평가에서만 처리하는 일회성 사건이며, 전역 규칙이 성립한 평가의 명령은 버린다. 자동 잠금(차속 3 km/h 이상) 중의 해제 명령은 적용되지 않는다 | 사용자 승인된 제안(A-03)의 확장. 질의 Q-04, Q-21, Q-23 |
+| A-17 | ignition off | ignition_on 입력이 VALID로 FALSE이면 입력 무효·오래됨 규칙 다음, 화재 해제 규칙 앞에서 두 출력을 RELEASE로 하고 state를 OFF로 한다. 충돌 CONFIRMED와 sensor_fault는 이보다 높다 | 질의 Q-12, Q-21 |
+| A-18 | 화재·과온·성인 | 세 입력이 동시이면 FIRE > OVERTEMPERATURE > ADULT_PRESENT 순으로 이유를 정한다. 이들의 해제는 접근위험 잠금(ASIL B)보다 높다 | 사용자 승인된 순서(A-03). 질의 Q-21 |
+| A-19 | override | override가 성립하면 그 문의 해제 명령을 적용하고(문 규칙 12), 접근위험 입력이 VALID로 FALSE가 될 때까지 유지해 그동안 그 문에 접근위험 규칙을 적용하지 않는다 | 질의 Q-22. 해석: "명시적 override로 처리" |
+| A-20 | 10초 | 첫 억제로부터 10,000 ms 이하이면 "10초 이하"이며 경계(10,000 ms)는 포함한다. 같은 명령은 같은 문을 대상으로 하는 unlock이면 된다(side가 달라도 그 문을 포함하면 같다) | OEM-FR-003의 "10초 이하", "같은 도어" |
+| A-21 | 접근위험 해제 | 접근위험 입력이 VALID로 FALSE가 되면 억제 기록과 override를 지운다. INVALID나 STALE일 때는 지우지 않는다 | 입력 상태 규칙(원인 해소) |
 
 ## 5. 입력 검사 규칙 (SWR-022, SWR-033, SWR-040 상세)
 
@@ -182,11 +203,14 @@
 | state | NORMAL, DEGRADED, FAULT, OFF |
 | input_validity (입력 항목별) | VALID, INVALID, STALE |
 | 반환 상태 | STATUS_OK, STATUS_ERR_TIME |
-| reason_code, priority_reason (같은 값) | NONE, CRASH_CONFIRMED, SENSOR_FAULT, INPUT_INVALID, INPUT_STALE, CRASH_PENDING |
+| reason_code, priority_reason (같은 값) | NONE, CRASH_CONFIRMED, SENSOR_FAULT, INPUT_INVALID, INPUT_STALE, CRASH_PENDING, IGNITION_OFF, FIRE, OVERTEMPERATURE, ADULT_PRESENT, APPROACH_RISK, APPROACH_OVERRIDE, ISOFIX, AUTO_LOCK, DRIVER_COMMAND |
 | warning_code | NONE, SENSOR_FAULT |
 | command_status | NONE, ACCEPTED, REJECTED |
+| override_left, override_right | TRUE, FALSE (문별 override 성립 여부) |
 
 ### 5.4 결정 규칙표 (SWR-023)
+
+전역 규칙 1~8을 위에서부터 평가해 처음 성립한 규칙이 두 문의 출력과 결정 이유를 정한다. 성립하는 전역 규칙이 없으면 문마다 문 규칙 9~12를 평가한다.
 
 | 규칙 | 조건 | 출력 | 결정 이유 | 근거 요구 |
 |---|---|---|---|---|
@@ -194,9 +218,27 @@
 | 2 | FAULT 조건 | 유지 | SENSOR_FAULT | SWR-021 |
 | 3 | 차량 입력 중 INVALID가 있음 | 유지 | INPUT_INVALID | SWR-034 |
 | 4 | 차량 입력 중 STALE이 있음 | 유지 | INPUT_STALE | SWR-024 |
-| 5 | (이후 이터레이션) 새 명령 규칙 | (이후 정의) | (이후 정의) | 이터레이션 2, 3 |
-| 6 | crash_status 입력 상태 VALID, 판정 값 PENDING | 유지 | CRASH_PENDING | SWR-036 |
-| 7 | 위 어느 규칙도 성립하지 않음 | 유지 | NONE | SWR-023 |
+| 5 | ignition_on 입력 상태 VALID, 판정 값 FALSE | RELEASE (두 문) | IGNITION_OFF | SWR-020 |
+| 6 | fire_detected 입력 상태 VALID, 판정 값 TRUE | RELEASE (두 문) | FIRE | SWR-017 |
+| 7 | overtemperature_detected 입력 상태 VALID, 판정 값 TRUE | RELEASE (두 문) | OVERTEMPERATURE | SWR-017 |
+| 8 | adult_present 입력 상태 VALID, 판정 값 TRUE | RELEASE (두 문) | ADULT_PRESENT | SWR-017 |
+
+문 규칙(문마다 위에서부터 처음 성립한 것이 그 문의 출력을 정한다):
+
+| 규칙 | 조건 (그 문) | 그 문의 출력 | 결정 이유 | 근거 요구 |
+|---|---|---|---|---|
+| 9 | 접근위험 입력 상태 VALID, 판정 값 TRUE, override 미성립 | LOCK | APPROACH_RISK | SWR-005, SWR-009 |
+| 10 | isofix 입력 상태 VALID, 판정 값 TRUE | LOCK | ISOFIX | SWR-018 |
+| 11 | vehicle_speed 입력 상태 VALID, 판정 값 30(3.0 km/h) 이상 | LOCK | AUTO_LOCK | SWR-003 |
+| 12 | 이번 평가의 유효한 명령이 그 문을 대상으로 함 | lock이면 LOCK, unlock이면 RELEASE | DRIVER_COMMAND (이번 평가에서 override가 성립했으면 APPROACH_OVERRIDE) | SWR-001, SWR-002, SWR-006 |
+| (없음) | 위 어느 규칙도 성립하지 않음 | 유지 | (아래 규칙 13, 14) | |
+
+결정 이유는 두 문 중 먼저 성립한 문 규칙의 번호가 작은 쪽(9가 가장 높음)의 이유로 한다. 같은 번호면 같은 이유다. 어느 문에도 문 규칙이 없으면:
+
+| 규칙 | 조건 | 출력 | 결정 이유 | 근거 요구 |
+|---|---|---|---|---|
+| 13 | crash_status 입력 상태 VALID, 판정 값 PENDING | 유지 | CRASH_PENDING | SWR-036 |
+| 14 | 위 어느 규칙도 성립하지 않음 | 유지 | NONE | SWR-023 |
 
 ### 5.5 입력 상태 전이표 (SWR-013, SWR-022, SWR-046)
 
@@ -224,3 +266,4 @@
 | 0.3 | 2026-11-27 | SWR-007, SWR-008, SWR-013, SWR-021, SWR-022, SWR-023, SWR-024, SWR-025, SWR-026, SWR-027, SWR-028, SWR-029, SWR-032, SWR-033, SWR-034, SWR-035, SWR-036, SWR-038, SWR-039, SWR-040, SWR-041, SWR-042, SWR-043, SWR-044, SWR-045 | SWE.1 리뷰 2회 부적합 20건 조치: 입력 상태 정의와 결정 규칙표(SWR-023)로 INVALID·STALE·state·이유 코드의 모순 제거, 복합 요구 분리(028→041, 029→042, 038→043, 023→044, 025→045), 시험 지원(039), now_ms 검사(040) 추가, 언어 확정 반영 | 안전 요구사항 문서, iter-1.md |
 | 0.4 | 2026-11-27 | SWR-007, SWR-013, SWR-021, SWR-022, SWR-023, SWR-025, SWR-028, SWR-032, SWR-034, SWR-035, SWR-039, SWR-040, SWR-041, SWR-044, SWR-046, SWR-047 | SWE.1 리뷰 3회 부적합 15건 조치: INVALID가 유효 갱신까지 이어지도록 입력 상태 재정의, timestamp 거절 요구(046), now_ms 거절 흐름, 초기 출력 전체 정의, 결정 규칙표(5.4), FAULT·DEGRADED 동시 가정(A-15), SWR-032 분리(047), 용어(DEGRADED 조건, 스냅샷 시각, 받아들인 스냅샷) 정의 | 안전 요구사항 문서, iter-1.md |
 | 0.5 | 2026-11-27 | SWR-007, SWR-008, SWR-013, SWR-022, SWR-024, SWR-026, SWR-027, SWR-032, SWR-035, SWR-040, SWR-046 | SWE.1 리뷰 4회 부적합 11건 조치와 단순화: freshness를 스냅샷 단위(마지막 수신 시각)로, 시간 입력을 정수 ms로, 입력 상태 전이표(5.5절) 도입, 반환 상태 값 정의, 도달 불가능한 조합(입력별 STALE) 제거. SWR-045는 SWR-013에 통합하고 번호는 재사용하지 않는다 | 안전 요구사항 문서, iter-1.md |
+| 0.6 | 2026-11-27 | SWR-001, SWR-002, SWR-003, SWR-005, SWR-006, SWR-009, SWR-017, SWR-018, SWR-020, SWR-023, SWR-025, SWR-035, SWR-036, SWR-048 | 이터레이션 2 범위 추가: 문 단위 규칙(접근위험, ISOFIX, 자동 잠금, 운전자 명령), 전역 해제 규칙(ignition off, 화재, 과온, 성인), override. 결정 규칙표 확장(5.4절), 질의 Q-21, Q-22, Q-23, 가정 A-16~A-21 | 안전 요구사항 문서, iter-2.md |
