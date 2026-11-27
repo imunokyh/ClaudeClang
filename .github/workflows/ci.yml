@@ -1,0 +1,81 @@
+# ClaudeClang CI (GitHub Actions).
+# 개발과 같은 Docker 이미지(claudeclangbuild)로 빌드·테스트·품질 검사를 한다.
+# 소스코드 품질 기준(CLAUDE.md 2절)을 하나라도 못 지키면 실패하며, PR은 이 검사를 통과해야 병합한다.
+# 스테이지가 실패해도 나머지를 끝까지 실행해 결과를 한 번에 보여준다.
+name: CI
+
+on:
+  push:
+    branches: [master, develop, 'feature/**', 'release/**', 'hotfix/**']
+  pull_request:
+    branches: [master, develop]
+  schedule:
+    - cron: '0 17 * * *'   # 매일 02:00 KST (UTC 17:00): develop 정기 점검
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_IMAGE: claudeclangbuild:latest
+
+jobs:
+  quality:
+    name: 빌드 및 품질 기준
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 정기 실행은 develop을 점검한다.
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+
+      - name: 빌드 이미지 만들기
+        run: docker build -t "$BUILD_IMAGE" docker
+
+      - name: 실행기 정의
+        run: |
+          cat > "$RUNNER_TEMP/gate.sh" <<'SH'
+          #!/usr/bin/env bash
+          # 사용: gate.sh <tools/run.sh 명령>
+          exec docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work \
+            -e GITHUB_STEP_SUMMARY "$BUILD_IMAGE" bash tools/run.sh "$1"
+          SH
+          chmod +x "$RUNNER_TEMP/gate.sh"
+
+      - { name: 포맷,                  if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" format' }
+      - { name: 빌드,                  if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" build' }
+      - { name: 반환·인터페이스 규칙,   if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" rules' }
+      - { name: HITL 주석,             if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" hitl' }
+      - name: HITL 사용자 리뷰 완료 (PR만)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: '"$RUNNER_TEMP/gate.sh" hitl-reviewed'
+      - { name: Doxygen,               if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" docs' }
+      - { name: 테스트 주석,            if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" testdocs' }
+      - { name: Cppcheck,              if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" static' }
+      - { name: Lizard (순환 복잡도·라인수), if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" complexity' }
+      - { name: CLOC 주석률,            if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" cloc' }
+      - { name: 단위 테스트 (MC/DC 100%),    if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" unit' }
+      - { name: 통합 테스트 (함수 커버리지 100%), if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" integration' }
+      - { name: TDD 테스트 (별도 보고),   if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" tdd' }
+      - { name: 추적성,                 if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" trace' }
+      - { name: 시스템 테스트 (요구사항 커버리지 100%), if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" system' }
+
+      - name: 요약
+        if: always()
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work "$BUILD_IMAGE" \
+            python3 tools/ci_summary.py >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: 테스트 결과 게시
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: build/reports/
+          if-no-files-found: ignore
+          retention-days: 30
