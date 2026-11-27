@@ -155,7 +155,9 @@ static bool has_any_validity(const normalized_inputs_t *inputs, validity_t valid
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool is_speed_at_least(const normalized_inputs_t *inputs, int64_t threshold)
 {
@@ -173,7 +175,9 @@ static bool is_speed_at_least(const normalized_inputs_t *inputs, int64_t thresho
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool targets_door(int side, door_t door)
 {
@@ -192,7 +196,9 @@ static bool targets_door(int side, door_t door)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool command_matches(const checked_command_t *command, door_t door, int action)
 {
@@ -211,7 +217,9 @@ static bool command_matches(const checked_command_t *command, door_t door, int a
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static lock_cmd_t get_door_output(const lock_outputs_t *outputs, door_t door)
 {
@@ -232,7 +240,9 @@ static lock_cmd_t get_door_output(const lock_outputs_t *outputs, door_t door)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static approach_step_t step_approach(door_approach_t current, bool risk, bool release,
                                      uint32_t now_ms)
@@ -279,7 +289,9 @@ static approach_step_t step_approach(door_approach_t current, bool risk, bool re
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static door_result_t decide_door(const arbiter_input_t *input, door_t door,
                                  door_approach_t *approach)
@@ -329,7 +341,9 @@ static door_result_t decide_door(const arbiter_input_t *input, door_t door,
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t decide_doors(const arbiter_input_t *input, decision_t *out)
 {
@@ -353,7 +367,9 @@ static status_t decide_doors(const arbiter_input_t *input, decision_t *out)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static arbiter_rule_t select_global_rule(const normalized_inputs_t *inputs)
 {
@@ -407,7 +423,9 @@ static arbiter_rule_t select_global_rule(const normalized_inputs_t *inputs)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t apply_global_rule(arbiter_rule_t rule, const lock_outputs_t *previous,
                                   decision_t *out)
@@ -468,7 +486,9 @@ static status_t apply_global_rule(arbiter_rule_t rule, const lock_outputs_t *pre
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static reason_t apply_fallback_reason(const normalized_inputs_t *inputs, reason_t reason)
 {
@@ -489,7 +509,9 @@ static reason_t apply_fallback_reason(const normalized_inputs_t *inputs, reason_
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static ctrl_state_t decide_state(bool fault_condition, bool degraded_condition, bool off_condition)
 {
@@ -523,7 +545,9 @@ static ctrl_state_t decide_state(bool fault_condition, bool degraded_condition, 
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t arbiter_decide(const arbiter_input_t *input, decision_t *out)
 {

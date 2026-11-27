@@ -41,7 +41,9 @@ typedef struct
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 NODISCARD status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config);
 

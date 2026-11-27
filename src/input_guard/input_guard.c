@@ -445,7 +445,9 @@ status_t input_guard_update(input_guard_t *guard, uint32_t now_ms, const raw_sna
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t input_guard_check_command(const raw_command_t *command, checked_command_t *out)
 {
