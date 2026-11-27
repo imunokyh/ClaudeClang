@@ -338,14 +338,17 @@ TEST(InputGuardUpdate, EqualTimestampIsAccepted)
  * @par 절차
  * 각각 input_guard_check_command 호출
  * @par 예상 출력값
- * 유효 조합만 COMMAND_ACCEPTED, 나머지는 COMMAND_REJECTED. 반환은 모두 STATUS_OK
+ * 유효 조합만 COMMAND_ACCEPTED(side, action 값 전달), 나머지는 COMMAND_REJECTED(side 0, action 0).
+ * 반환은 모두 STATUS_OK
  */
 TEST(InputGuardCommand, FieldRules)
 {
-    command_status_t status = COMMAND_NONE;
+    checked_command_t status = {COMMAND_NONE, 0, 0};
     raw_command_t cmd = {{true, 2.0}, {true, 1.0}, {true, 3.0}};
     ASSERT_EQ(STATUS_OK, input_guard_check_command(&cmd, &status));
-    EXPECT_EQ(COMMAND_ACCEPTED, status);
+    EXPECT_EQ(COMMAND_ACCEPTED, status.status);
+    EXPECT_EQ(2, status.side);
+    EXPECT_EQ(1, status.action);
 
     raw_command_t cases[] = {
         {{true, 3.0}, {true, 1.0}, {true, 3.0}}, {{false, 1.0}, {true, 1.0}, {true, 3.0}},
@@ -355,13 +358,15 @@ TEST(InputGuardCommand, FieldRules)
     };
     for (const raw_command_t &c : cases)
     {
-        status = COMMAND_NONE;
+        status = {COMMAND_NONE, 0, 0};
         ASSERT_EQ(STATUS_OK, input_guard_check_command(&c, &status));
-        EXPECT_EQ(COMMAND_REJECTED, status);
+        EXPECT_EQ(COMMAND_REJECTED, status.status);
+        EXPECT_EQ(0, status.side);
+        EXPECT_EQ(0, status.action);
     }
     raw_command_t zero = {{true, 0.0}, {true, 0.0}, {true, 0.0}};
     ASSERT_EQ(STATUS_OK, input_guard_check_command(&zero, &status));
-    EXPECT_EQ(COMMAND_ACCEPTED, status);
+    EXPECT_EQ(COMMAND_ACCEPTED, status.status);
 }
 
 /**
@@ -376,9 +381,9 @@ TEST(InputGuardCommand, FieldRules)
  */
 TEST(InputGuardCommand, NullArgumentsAreRejected)
 {
-    command_status_t status = COMMAND_NONE;
+    checked_command_t status = {COMMAND_NONE, 0, 0};
     raw_command_t cmd = {{true, 0.0}, {true, 0.0}, {true, 0.0}};
     EXPECT_EQ(STATUS_ERR_PARAM, input_guard_check_command(nullptr, &status));
-    EXPECT_EQ(COMMAND_NONE, status);
+    EXPECT_EQ(COMMAND_NONE, status.status);
     EXPECT_EQ(STATUS_ERR_PARAM, input_guard_check_command(&cmd, nullptr));
 }

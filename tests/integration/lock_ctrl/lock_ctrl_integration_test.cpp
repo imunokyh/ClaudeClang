@@ -25,6 +25,7 @@ class Harness
         {
             snapshot_.item[i] = {true, 0.0};
         }
+        snapshot_.item[ITEM_IGNITION_ON] = {true, 1.0}; // 시동 켜짐
     }
 
     /** 스냅샷의 항목 값을 바꾼다. */
@@ -277,26 +278,30 @@ TEST(IntegrationFlow, TimeRegressionKeepsResult)
 
 /**
  * @test IT-008
- * @brief 운전자 명령은 검사 결과만 command_status로 나오고 출력과 state를 바꾸지 않는다 (SWR-033;
- * IF-001).
+ * @brief 유효한 운전자 명령만 적용되고 무효한 명령은 거절되어 출력을 바꾸지 않는다
+ *        (SWR-033, SWR-001; IF-001, IF-002).
  * @par 입력값
- * 초기 출력 LOCK, 유효한 명령, 무효한 명령(side 7), 명령 없음
+ * 초기 출력 LOCK, 유효한 명령(all, unlock), 무효한 명령(side 7), 명령 없음
  * @par 절차
  * 각각 평가
  * @par 예상 출력값
- * ACCEPTED, REJECTED, NONE. 세 경우 모두 출력 LOCK 유지, state NORMAL
+ * ACCEPTED(두 출력 RELEASE, reason DRIVER_COMMAND), REJECTED(직전 출력 RELEASE 유지, reason NONE),
+ * NONE. state는 모두 NORMAL
  */
-TEST(IntegrationFlow, CommandDoesNotChangeOutputs)
+TEST(IntegrationFlow, CommandAppliedOnlyWhenValid)
 {
     Harness h(LOCK_LOCK);
     raw_command_t good = {{true, 2.0}, {true, 1.0}, {true, 0.0}};
     raw_command_t bad = {{true, 7.0}, {true, 0.0}, {true, 0.0}};
     ASSERT_EQ(STATUS_OK, h.step(10, true, &good));
     EXPECT_EQ(COMMAND_ACCEPTED, h.result().command_status);
-    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(REASON_DRIVER_COMMAND, h.result().reason);
     ASSERT_EQ(STATUS_OK, h.step(20, true, &bad));
     EXPECT_EQ(COMMAND_REJECTED, h.result().command_status);
-    EXPECT_EQ(LOCK_LOCK, h.result().outputs.right);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(REASON_NONE, h.result().reason);
     ASSERT_EQ(STATUS_OK, h.step(30));
     EXPECT_EQ(COMMAND_NONE, h.result().command_status);
     EXPECT_EQ(STATE_NORMAL, h.result().state);
@@ -440,4 +445,242 @@ TEST(IntegrationPerformance, EvaluationTimeWithinCycle)
         }
     }
     EXPECT_LE(worst, std::chrono::milliseconds(10));
+}
+
+namespace
+{
+
+constexpr raw_command_t kUnlockLeftCmd = {{true, 0.0}, {true, 1.0}, {true, 0.0}};
+constexpr raw_command_t kUnlockRightCmd = {{true, 1.0}, {true, 1.0}, {true, 0.0}};
+constexpr raw_command_t kUnlockAllCmd = {{true, 2.0}, {true, 1.0}, {true, 0.0}};
+constexpr raw_command_t kLockAllCmd = {{true, 2.0}, {true, 0.0}, {true, 0.0}};
+
+} // namespace
+
+/**
+ * @test IT-014
+ * @brief ignition off는 두 출력을 해제하고 OFF 상태로 하며, 시동이 켜져도 직전 출력을 유지한다
+ *        (SWR-020, 035; IF-001, IF-002).
+ * @par 입력값
+ * 초기 출력 LOCK, ignition_on 0 → 1
+ * @par 절차
+ * 두 번 평가
+ * @par 예상 출력값
+ * 1번째: RELEASE, RELEASE, OFF, IGNITION_OFF. 2번째: RELEASE 유지, NORMAL, NONE
+ */
+TEST(IntegrationDoorRules, IgnitionOffThenOn)
+{
+    Harness h(LOCK_LOCK);
+    h.set(ITEM_IGNITION_ON, 0.0);
+    ASSERT_EQ(STATUS_OK, h.step(10));
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(STATE_OFF, h.result().state);
+    EXPECT_EQ(REASON_IGNITION_OFF, h.result().reason);
+    h.set(ITEM_IGNITION_ON, 1.0);
+    ASSERT_EQ(STATUS_OK, h.step(20));
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_EQ(STATE_NORMAL, h.result().state);
+    EXPECT_EQ(REASON_NONE, h.result().reason);
+}
+
+/**
+ * @test IT-015
+ * @brief 화재, 과온, 성인 탑승은 접근위험 잠금보다 우선해 두 출력을 해제하고, 입력이 사라지면
+ * 해제를 유지한다 (SWR-017, 023, 가정 A-18; IF-002).
+ * @par 입력값
+ * 초기 출력 LOCK, 좌 접근위험 TRUE와 성인 탑승 TRUE, 이후 성인 탑승 FALSE
+ * @par 절차
+ * 두 번 평가
+ * @par 예상 출력값
+ * 1번째: RELEASE, RELEASE, ADULT_PRESENT. 2번째: 좌 접근위험 규칙이 다시 적용되어 lock_left
+ * LOCK(APPROACH_RISK), lock_right RELEASE 유지
+ */
+TEST(IntegrationDoorRules, ForcedReleaseBeatsApproachRisk)
+{
+    Harness h(LOCK_LOCK);
+    h.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    h.set(ITEM_ADULT_PRESENT, 1.0);
+    ASSERT_EQ(STATUS_OK, h.step(10));
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(REASON_ADULT_PRESENT, h.result().reason);
+    h.set(ITEM_ADULT_PRESENT, 0.0);
+    ASSERT_EQ(STATUS_OK, h.step(20));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(REASON_APPROACH_RISK, h.result().reason);
+}
+
+/**
+ * @test IT-016
+ * @brief 접근위험 문은 잠기고 해제 요청이 억제되며 다른 문은 영향받지 않고, 접근위험이 풀리면
+ * 해제할 수 있다 (SWR-005, 009, 048; IF-001, IF-002).
+ * @par 입력값
+ * 초기 RELEASE, 좌 접근위험 TRUE에서 좌 unlock, 우 unlock, 이후 접근위험 FALSE에서 좌 unlock
+ * @par 절차
+ * 순서대로 평가
+ * @par 예상 출력값
+ * 좌 unlock: lock_left LOCK 유지(APPROACH_RISK). 우 unlock: lock_right RELEASE. 접근위험 해제 후 좌
+ * unlock: lock_left RELEASE
+ */
+TEST(IntegrationDoorRules, ApproachRiskSuppressesOnlyThatDoor)
+{
+    Harness h(LOCK_RELEASE);
+    h.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, h.step(10));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    ASSERT_EQ(STATUS_OK, h.step(20, true, &kUnlockLeftCmd));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(REASON_APPROACH_RISK, h.result().reason);
+    EXPECT_FALSE(h.result().override_active[DOOR_LEFT]);
+    ASSERT_EQ(STATUS_OK, h.step(30, true, &kUnlockRightCmd));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    h.set(ITEM_REAR_LEFT_APPROACH_RISK, 0.0);
+    ASSERT_EQ(STATUS_OK, h.step(40, true, &kUnlockLeftCmd));
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_EQ(REASON_DRIVER_COMMAND, h.result().reason);
+}
+
+/**
+ * @test IT-017
+ * @brief 첫 억제 후 10,000 ms 이하에 같은 해제 요청이 다시 오면 override가 성립하고, 초과하면 새 첫
+ * 억제이다. override는 접근위험이 풀릴 때까지 이어진다 (SWR-006, 048; IF-001, IF-002, IF-003).
+ * @par 입력값
+ * 좌 접근위험 TRUE에서 좌 unlock을 10 ms와 10,010 ms에 입력(경과 10,000 ms). 별도 제어기에서 10
+ * ms와 10,020 ms (경과 10,010 ms)에 입력
+ * @par 절차
+ * 10 ms 간격으로 평가하며 명령을 해당 시각에 넣는다
+ * @par 예상 출력값
+ * 경과 10,000 ms: override_active 좌 true, lock_left RELEASE, APPROACH_OVERRIDE. 이후 접근위험 TRUE
+ * 유지에도 RELEASE 유지, 접근위험 FALSE에서 override false. 경과 10,010 ms: LOCK 유지, override
+ * false, 억제 기록 갱신
+ */
+TEST(IntegrationDoorRules, OverrideFlow)
+{
+    Harness h(LOCK_RELEASE);
+    h.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, h.step(10, true, &kUnlockLeftCmd));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    for (uint32_t now = 20; now < 10010; now += 10)
+    {
+        ASSERT_EQ(STATUS_OK, h.step(now));
+        ASSERT_EQ(LOCK_LOCK, h.result().outputs.left);
+    }
+    ASSERT_EQ(STATUS_OK, h.step(10010, true, &kUnlockLeftCmd));
+    EXPECT_TRUE(h.result().override_active[DOOR_LEFT]);
+    EXPECT_FALSE(h.result().override_active[DOOR_RIGHT]);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_EQ(REASON_APPROACH_OVERRIDE, h.result().reason);
+    ASSERT_EQ(STATUS_OK, h.step(10020));
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_TRUE(h.result().override_active[DOOR_LEFT]);
+    h.set(ITEM_REAR_LEFT_APPROACH_RISK, 0.0);
+    ASSERT_EQ(STATUS_OK, h.step(10030));
+    EXPECT_FALSE(h.result().override_active[DOOR_LEFT]);
+
+    Harness late(LOCK_RELEASE);
+    late.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, late.step(10, true, &kUnlockLeftCmd));
+    for (uint32_t now = 20; now < 10020; now += 10)
+    {
+        ASSERT_EQ(STATUS_OK, late.step(now));
+    }
+    ASSERT_EQ(STATUS_OK, late.step(10020, true, &kUnlockLeftCmd));
+    EXPECT_FALSE(late.result().override_active[DOOR_LEFT]);
+    EXPECT_EQ(LOCK_LOCK, late.result().outputs.left);
+    ASSERT_EQ(STATUS_OK, late.step(10030, true, &kUnlockLeftCmd));
+    EXPECT_TRUE(late.result().override_active[DOOR_LEFT]);
+    EXPECT_EQ(LOCK_RELEASE, late.result().outputs.left);
+}
+
+/**
+ * @test IT-018
+ * @brief 문 규칙 우선순위(ISOFIX > 자동 잠금 > 명령)와 잠금 유지가 평가에 걸쳐 이어진다
+ *        (SWR-003, 018, 001; IF-002).
+ * @par 입력값
+ * 초기 RELEASE, isofix_left TRUE에서 (all, unlock), 차속 10 km/h에서 (all, unlock), 정지 후 (all,
+ * unlock)
+ * @par 절차
+ * 순서대로 평가
+ * @par 예상 출력값
+ * 1: lock_left LOCK(ISOFIX), lock_right RELEASE. 2: 두 문 LOCK(좌는 ISOFIX, 우는 AUTO_LOCK이며
+ * 순위가 높은 ISOFIX가 이유). 정지 후 isofix FALSE: 직전 출력 LOCK 유지, (all, unlock)으로 두 문
+ * RELEASE(DRIVER_COMMAND)
+ */
+TEST(IntegrationDoorRules, IsofixAutoLockAndCommandPriority)
+{
+    Harness h(LOCK_RELEASE);
+    h.set(ITEM_ISOFIX_LEFT, 1.0);
+    ASSERT_EQ(STATUS_OK, h.step(10, true, &kUnlockAllCmd));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(REASON_ISOFIX, h.result().reason);
+    h.set(ITEM_VEHICLE_SPEED, 10.0);
+    ASSERT_EQ(STATUS_OK, h.step(20, true, &kUnlockAllCmd));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.right);
+    EXPECT_EQ(REASON_ISOFIX, h.result().reason);
+    h.set(ITEM_VEHICLE_SPEED, 0.0);
+    h.set(ITEM_ISOFIX_LEFT, 0.0);
+    ASSERT_EQ(STATUS_OK, h.step(30));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.right);
+    ASSERT_EQ(STATUS_OK, h.step(40, true, &kUnlockAllCmd));
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(REASON_DRIVER_COMMAND, h.result().reason);
+}
+
+/**
+ * @test IT-019
+ * @brief 전역 규칙이 성립한 평가의 운전자 명령은 버려지고 다음 평가로 이어지지 않는다
+ *        (SWR-001, 가정 A-16; IF-001, IF-002).
+ * @par 입력값
+ * 초기 LOCK, sensor_fault TRUE에서 (all, unlock), 이어서 sensor_fault FALSE이고 명령 없음
+ * @par 절차
+ * 두 번 평가
+ * @par 예상 출력값
+ * 1: LOCK 유지, SENSOR_FAULT, command_status ACCEPTED. 2: LOCK 유지(명령은 이어지지 않음), reason
+ * NONE
+ */
+TEST(IntegrationDoorRules, CommandDroppedUnderGlobalRule)
+{
+    Harness h(LOCK_LOCK);
+    h.set(ITEM_SENSOR_FAULT, 1.0);
+    ASSERT_EQ(STATUS_OK, h.step(10, true, &kUnlockAllCmd));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(REASON_SENSOR_FAULT, h.result().reason);
+    EXPECT_EQ(COMMAND_ACCEPTED, h.result().command_status);
+    h.set(ITEM_SENSOR_FAULT, 0.0);
+    ASSERT_EQ(STATUS_OK, h.step(20));
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(LOCK_LOCK, h.result().outputs.right);
+    EXPECT_EQ(REASON_NONE, h.result().reason);
+}
+
+/**
+ * @test IT-020
+ * @brief 운전자 명령의 source 네 값은 같은 결과를 낸다 (SWR-002; IF-001, IF-002).
+ * @par 입력값
+ * (all, lock) 명령에 source 0~3, 초기 RELEASE
+ * @par 절차
+ * source마다 새 제어기로 평가
+ * @par 예상 출력값
+ * 네 경우 모두 두 출력 LOCK, reason DRIVER_COMMAND, command_status ACCEPTED
+ */
+TEST(IntegrationDoorRules, SourceDoesNotMatter)
+{
+    for (int source = 0; source < 4; ++source)
+    {
+        Harness h(LOCK_RELEASE);
+        raw_command_t command = kLockAllCmd;
+        command.source = {true, static_cast<double>(source)};
+        ASSERT_EQ(STATUS_OK, h.step(10, true, &command));
+        EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+        EXPECT_EQ(LOCK_LOCK, h.result().outputs.right);
+        EXPECT_EQ(REASON_DRIVER_COMMAND, h.result().reason);
+        EXPECT_EQ(COMMAND_ACCEPTED, h.result().command_status);
+    }
 }

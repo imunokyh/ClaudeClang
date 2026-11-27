@@ -228,7 +228,7 @@ TEST(LockCtrlEvaluate, SuccessCommitsResult)
 {
     lock_ctrl_t ctrl = ready_ctrl();
     g_stub.decision = {
-        {LOCK_LOCK, LOCK_RELEASE}, STATE_FAULT, REASON_SENSOR_FAULT, WARNING_SENSOR_FAULT};
+        {LOCK_LOCK, LOCK_RELEASE}, STATE_FAULT, REASON_SENSOR_FAULT, WARNING_SENSOR_FAULT, {}};
     g_stub.normalized.validity[ITEM_GEAR] = VALIDITY_INVALID;
     g_stub.normalized.validity[ITEM_CRASH_STATUS] = VALIDITY_STALE;
     lock_ctrl_result_t result = {};
@@ -267,7 +267,7 @@ TEST(LockCtrlEvaluate, CommandStatusFlow)
     ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 10, nullptr, &result));
     EXPECT_EQ(0, g_stub.check_calls);
     EXPECT_EQ(COMMAND_NONE, result.command_status);
-    g_stub.command_status = COMMAND_REJECTED;
+    g_stub.checked = {COMMAND_REJECTED, 0, 0};
     raw_command_t command = {{true, 9.0}, {true, 0.0}, {true, 0.0}};
     ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 20, &command, &result));
     EXPECT_EQ(1, g_stub.check_calls);
@@ -363,4 +363,90 @@ TEST(LockCtrlGetResult, NullArgumentsAreRejected)
     lock_ctrl_result_t result = {};
     EXPECT_EQ(STATUS_ERR_PARAM, lock_ctrl_get_result(nullptr, &result));
     EXPECT_EQ(STATUS_ERR_PARAM, lock_ctrl_get_result(&ctrl, nullptr));
+}
+
+/**
+ * @test UT-080
+ * @brief 초기화는 접근위험 기록과 결과의 override 상태를 지운다 (FN-020, FN-026, SWR-025).
+ * @par 입력값
+ * 접근위험 기록(override true)이 채워진 ctrl
+ * @par 절차
+ * lock_ctrl_init 후 결과 조회
+ * @par 예상 출력값
+ * 결과의 override_active가 좌, 우 모두 false. 다음 평가에서 arbiter에 넘기는 기록도 모두 false
+ */
+TEST(LockCtrlApproach, InitClearsApproachState)
+{
+    stub_reset();
+    lock_ctrl_t ctrl = {};
+    ctrl.approach.door[DOOR_LEFT] = {true, true, 77};
+    ctrl.approach.door[DOOR_RIGHT] = {true, true, 88};
+    lock_ctrl_result_t result = {};
+    ASSERT_EQ(STATUS_OK, lock_ctrl_init(&ctrl, nullptr));
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_result(&ctrl, &result));
+    EXPECT_FALSE(result.override_active[DOOR_LEFT]);
+    EXPECT_FALSE(result.override_active[DOOR_RIGHT]);
+    ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 10, nullptr, &result));
+    EXPECT_FALSE(g_stub.last_approach_in.door[DOOR_LEFT].override_active);
+    EXPECT_FALSE(g_stub.last_approach_in.door[DOOR_RIGHT].pending);
+}
+
+/**
+ * @test UT-081
+ * @brief arbiter가 낸 새 접근위험 기록이 결과의 override 상태가 되고 다음 평가의 입력으로 전달된다
+ *        (FN-024, FN-025).
+ * @par 입력값
+ * 스텁 결정의 접근위험 기록: 좌 {pending false, override true, 500}, 우 {pending true, override
+ * false, 600}
+ * @par 절차
+ * 평가 두 번(두 번째는 명령 포함, 스텁 검사 결과 ACCEPTED(side 1, action 1))
+ * @par 예상 출력값
+ * 첫 결과: override_active 좌 true, 우 false. 두 번째 평가에서 arbiter에 넘긴 기록이 첫 결정의
+ * 기록과 같고, 검사한 명령(side 1, action 1)과 평가 시각(20)이 그대로 전달됨
+ */
+TEST(LockCtrlApproach, ApproachStateIsCommittedAndPassedOn)
+{
+    lock_ctrl_t ctrl = ready_ctrl();
+    g_stub.decision.approach.door[DOOR_LEFT] = {false, true, 500};
+    g_stub.decision.approach.door[DOOR_RIGHT] = {true, false, 600};
+    lock_ctrl_result_t result = {};
+    ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 10, nullptr, &result));
+    EXPECT_TRUE(result.override_active[DOOR_LEFT]);
+    EXPECT_FALSE(result.override_active[DOOR_RIGHT]);
+    g_stub.checked = {COMMAND_ACCEPTED, 1, 1};
+    raw_command_t command = {{true, 1.0}, {true, 1.0}, {true, 0.0}};
+    ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 20, &command, &result));
+    EXPECT_TRUE(g_stub.last_approach_in.door[DOOR_LEFT].override_active);
+    EXPECT_FALSE(g_stub.last_approach_in.door[DOOR_LEFT].pending);
+    EXPECT_EQ(500u, g_stub.last_approach_in.door[DOOR_LEFT].pending_ms);
+    EXPECT_TRUE(g_stub.last_approach_in.door[DOOR_RIGHT].pending);
+    EXPECT_EQ(600u, g_stub.last_approach_in.door[DOOR_RIGHT].pending_ms);
+    EXPECT_EQ(COMMAND_ACCEPTED, g_stub.last_command.status);
+    EXPECT_EQ(1, g_stub.last_command.side);
+    EXPECT_EQ(1, g_stub.last_command.action);
+    EXPECT_EQ(20u, g_stub.last_decide_now_ms);
+}
+
+/**
+ * @test UT-082
+ * @brief arbiter가 실패하면 새 접근위험 기록을 확정하지 않는다 (FN-024 R3, R4).
+ * @par 입력값
+ * 스텁 decide가 STATUS_ERR_PARAM과 override 기록을 반환, 이후 정상 결정(빈 기록)
+ * @par 절차
+ * 실패 평가 한 번 후 정상 평가 한 번
+ * @par 예상 출력값
+ * 정상 평가에서 arbiter에 넘긴 접근위험 기록이 모두 false(실패한 평가의 기록은 반영되지 않음)
+ */
+TEST(LockCtrlApproach, FailedDecideDoesNotCommitApproachState)
+{
+    lock_ctrl_t ctrl = ready_ctrl();
+    g_stub.decide_status = STATUS_ERR_PARAM;
+    g_stub.decision.approach.door[DOOR_LEFT] = {true, true, 5};
+    lock_ctrl_result_t result = {};
+    EXPECT_EQ(STATUS_ERR_PARAM, evaluate(&ctrl, 10, nullptr, &result));
+    g_stub.decide_status = STATUS_OK;
+    g_stub.decision.approach = {};
+    ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 20, nullptr, &result));
+    EXPECT_FALSE(g_stub.last_approach_in.door[DOOR_LEFT].override_active);
+    EXPECT_FALSE(g_stub.last_approach_in.door[DOOR_LEFT].pending);
 }

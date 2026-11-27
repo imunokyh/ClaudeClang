@@ -13,13 +13,16 @@ struct StubControl
     status_t check_status;
     status_t decide_status;
     normalized_inputs_t normalized;
-    command_status_t command_status;
+    checked_command_t checked;
     decision_t decision;
     int update_calls;
     int check_calls;
     int decide_calls;
     uint32_t last_update_now_ms;
     lock_outputs_t last_previous;
+    checked_command_t last_command;
+    uint32_t last_decide_now_ms;
+    approach_state_t last_approach_in;
 };
 
 extern StubControl g_stub;

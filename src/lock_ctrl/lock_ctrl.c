@@ -1,7 +1,7 @@
 /**
  * @file lock_ctrl.c
  * @brief 차일드락 제어 컴포넌트 구현 (CMP-003, MOD-003). 평가 순서를 지휘한다.
- * @trace SWR-025 SWR-026 SWR-027 SWR-031 SWR-039 SWR-040 SWR-044
+ * @trace SWR-025 SWR-026 SWR-027 SWR-031 SWR-039 SWR-040 SWR-044 SWR-048
  */
 #include "lock_ctrl/lock_ctrl_if.h"
 
@@ -54,6 +54,8 @@ static status_t make_initial_result(const lock_outputs_t *initial, lock_ctrl_res
     result->priority_reason = REASON_NONE;
     result->warning = WARNING_NONE;
     result->command_status = COMMAND_NONE;
+    result->override_active[DOOR_LEFT] = false;
+    result->override_active[DOOR_RIGHT] = false;
     for (int index = 0; index < (int)ITEM_COUNT; index++)
     {
         result->input_validity[index] = VALIDITY_STALE;
@@ -109,6 +111,8 @@ static status_t build_result(const decision_t *decision, const normalized_inputs
     result->priority_reason = decision->reason;
     result->warning = decision->warning;
     result->command_status = command;
+    result->override_active[DOOR_LEFT] = decision->approach.door[DOOR_LEFT].override_active;
+    result->override_active[DOOR_RIGHT] = decision->approach.door[DOOR_RIGHT].override_active;
     for (int index = 0; index < (int)ITEM_COUNT; index++)
     {
         result->input_validity[index] = inputs->validity[index];
@@ -138,27 +142,34 @@ static status_t run_evaluation(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input
                                lock_ctrl_result_t *result)
 {
     normalized_inputs_t normalized = {{VALIDITY_VALID}, {0}};
-    decision_t decision = {{LOCK_RELEASE, LOCK_RELEASE}, STATE_NORMAL, REASON_NONE, WARNING_NONE};
+    decision_t decision = {{LOCK_RELEASE, LOCK_RELEASE},
+                           STATE_NORMAL,
+                           REASON_NONE,
+                           WARNING_NONE,
+                           {{{false, false, 0}, {false, false, 0}}}};
     lock_ctrl_result_t built = ctrl->result;
-    command_status_t command_status = COMMAND_NONE;
+    checked_command_t checked = {COMMAND_NONE, 0, 0};
     status_t status = input_guard_update(&ctrl->guard, input->now_ms, input->snapshot, &normalized);
 
     if ((status == STATUS_OK) && (input->command != NULL))
     {
-        status = input_guard_check_command(input->command, &command_status);
+        status = input_guard_check_command(input->command, &checked);
     }
     if (status == STATUS_OK)
     {
-        status = arbiter_decide(&normalized, &ctrl->outputs, &decision);
+        const arbiter_input_t arbiter_input = {&normalized, ctrl->outputs, checked, input->now_ms,
+                                               ctrl->approach};
+        status = arbiter_decide(&arbiter_input, &decision);
     }
     if (status == STATUS_OK)
     {
-        status = build_result(&decision, &normalized, command_status, &built);
+        status = build_result(&decision, &normalized, checked.status, &built);
     }
     if (status == STATUS_OK)
     {
         ctrl->result = built;
         ctrl->outputs = decision.outputs;
+        ctrl->approach = decision.approach;
         ctrl->last_now_ms = input->now_ms;
         ctrl->has_evaluated = true;
         *result = built;
@@ -198,6 +209,7 @@ status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config)
     if (status == STATUS_OK)
     {
         ctrl->outputs = initial;
+        ctrl->approach = (approach_state_t){{{false, false, 0}, {false, false, 0}}};
         ctrl->last_now_ms = 0;
         ctrl->has_evaluated = false;
         status = make_initial_result(&initial, &ctrl->result);

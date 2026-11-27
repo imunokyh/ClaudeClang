@@ -26,6 +26,7 @@ class Rig
         {
             snapshot_.item[i] = {true, 0.0};
         }
+        snapshot_.item[ITEM_IGNITION_ON] = {true, 1.0}; // 시동 켜짐
     }
 
     void set(input_item_t item, double value)
@@ -410,8 +411,9 @@ TEST(SystemFunctional, Ftc025CommandAccepted)
     raw_command_t command = {{true, 2.0}, {true, 1.0}, {true, 2.0}};
     ASSERT_EQ(STATUS_OK, rig.step(10, true, &command));
     EXPECT_EQ(COMMAND_ACCEPTED, rig.r().command_status);
-    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
-    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_DRIVER_COMMAND, rig.r().reason);
     EXPECT_EQ(STATE_NORMAL, rig.r().state);
 }
 
@@ -440,6 +442,247 @@ TEST(SystemFunctional, Ftc028NoCommand)
     Rig rig(LOCK_LOCK);
     ASSERT_EQ(STATUS_OK, rig.step(10));
     EXPECT_EQ(COMMAND_NONE, rig.r().command_status);
+}
+
+namespace
+{
+
+constexpr raw_command_t kUnlockLeft = {{true, 0.0}, {true, 1.0}, {true, 0.0}};
+constexpr raw_command_t kUnlockAll = {{true, 2.0}, {true, 1.0}, {true, 0.0}};
+
+/** 첫 억제 후 경과 시간(ms)을 두고 같은 해제 요청을 다시 넣어 마지막 평가까지 진행한다. */
+void suppress_then_repeat(Rig &rig, uint32_t elapsed_ms)
+{
+    rig.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10, true, &kUnlockLeft));
+    for (uint32_t now = 20; now < 10 + elapsed_ms; now += 10)
+    {
+        ASSERT_EQ(STATUS_OK, rig.step(now));
+    }
+    ASSERT_EQ(STATUS_OK, rig.step(10 + elapsed_ms, true, &kUnlockLeft));
+}
+
+} // namespace
+
+// FTC-029
+TEST(SystemFunctional, Ftc029IgnitionOff)
+{
+    Rig rig(LOCK_LOCK);
+    rig.set(ITEM_IGNITION_ON, 0.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(STATE_OFF, rig.r().state);
+    EXPECT_EQ(REASON_IGNITION_OFF, rig.r().reason);
+}
+
+// FTC-030, FTC-031, FTC-032
+TEST(SystemFunctional, Ftc030Fire)
+{
+    Rig rig(LOCK_LOCK);
+    rig.set(ITEM_FIRE_DETECTED, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_FIRE, rig.r().reason);
+}
+
+TEST(SystemFunctional, Ftc031Overtemperature)
+{
+    Rig rig(LOCK_LOCK);
+    rig.set(ITEM_OVERTEMPERATURE_DETECTED, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_OVERTEMPERATURE, rig.r().reason);
+}
+
+TEST(SystemFunctional, Ftc032AdultPresent)
+{
+    Rig rig(LOCK_LOCK);
+    rig.set(ITEM_ADULT_PRESENT, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_ADULT_PRESENT, rig.r().reason);
+}
+
+// FTC-033
+TEST(SystemFunctional, Ftc033ForcedReleasePriority)
+{
+    Rig rig(LOCK_LOCK);
+    rig.set(ITEM_FIRE_DETECTED, 1.0);
+    rig.set(ITEM_OVERTEMPERATURE_DETECTED, 1.0);
+    rig.set(ITEM_ADULT_PRESENT, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_FIRE, rig.r().reason);
+}
+
+// FTC-034
+TEST(SystemFunctional, Ftc034ApproachRiskLocksOneDoor)
+{
+    Rig rig(LOCK_RELEASE);
+    rig.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_APPROACH_RISK, rig.r().reason);
+}
+
+// FTC-035
+TEST(SystemFunctional, Ftc035FirstUnlockSuppressed)
+{
+    Rig rig(LOCK_RELEASE);
+    rig.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    ASSERT_EQ(STATUS_OK, rig.step(20, true, &kUnlockLeft));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(REASON_APPROACH_RISK, rig.r().reason);
+    EXPECT_FALSE(rig.r().override_active[DOOR_LEFT]);
+}
+
+// FTC-036
+TEST(SystemFunctional, Ftc036OverrideAtTenSeconds)
+{
+    Rig rig(LOCK_RELEASE);
+    suppress_then_repeat(rig, 10000);
+    EXPECT_TRUE(rig.r().override_active[DOOR_LEFT]);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(REASON_APPROACH_OVERRIDE, rig.r().reason);
+}
+
+// FTC-037
+TEST(SystemFunctional, Ftc037ExpiredWindowIsNewSuppression)
+{
+    Rig rig(LOCK_RELEASE);
+    suppress_then_repeat(rig, 10010);
+    EXPECT_FALSE(rig.r().override_active[DOOR_LEFT]);
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(REASON_APPROACH_RISK, rig.r().reason);
+    ASSERT_EQ(STATUS_OK, rig.step(10030, true, &kUnlockLeft));
+    EXPECT_TRUE(rig.r().override_active[DOOR_LEFT]);
+}
+
+// FTC-038
+TEST(SystemFunctional, Ftc038OverridePersistsUntilRiskClears)
+{
+    Rig rig(LOCK_RELEASE);
+    suppress_then_repeat(rig, 10000);
+    ASSERT_TRUE(rig.r().override_active[DOOR_LEFT]);
+    ASSERT_EQ(STATUS_OK, rig.step(10020));
+    EXPECT_TRUE(rig.r().override_active[DOOR_LEFT]);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    rig.set(ITEM_REAR_LEFT_APPROACH_RISK, 0.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10030));
+    EXPECT_FALSE(rig.r().override_active[DOOR_LEFT]);
+}
+
+// FTC-039
+TEST(SystemFunctional, Ftc039IsofixOneDoor)
+{
+    Rig rig(LOCK_RELEASE);
+    rig.set(ITEM_ISOFIX_LEFT, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_ISOFIX, rig.r().reason);
+    rig.set(ITEM_ISOFIX_LEFT, 0.0);
+    ASSERT_EQ(STATUS_OK, rig.step(20));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+}
+
+// FTC-040
+TEST(SystemFunctional, Ftc040AutoLockBoundary)
+{
+    Rig rig(LOCK_RELEASE);
+    rig.set(ITEM_VEHICLE_SPEED, 2.9);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    rig.set(ITEM_VEHICLE_SPEED, 3.0);
+    ASSERT_EQ(STATUS_OK, rig.step(20));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
+    EXPECT_EQ(REASON_AUTO_LOCK, rig.r().reason);
+}
+
+// FTC-041
+TEST(SystemFunctional, Ftc041CommandsApplyToSelectedDoor)
+{
+    Rig rig(LOCK_RELEASE);
+    const raw_command_t lock_left = {{true, 0.0}, {true, 0.0}, {true, 0.0}};
+    const raw_command_t lock_right = {{true, 1.0}, {true, 0.0}, {true, 0.0}};
+    const raw_command_t unlock_left = {{true, 0.0}, {true, 1.0}, {true, 0.0}};
+    const raw_command_t unlock_right = {{true, 1.0}, {true, 1.0}, {true, 0.0}};
+    ASSERT_EQ(STATUS_OK, rig.step(10, true, &lock_left));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    ASSERT_EQ(STATUS_OK, rig.step(20, true, &lock_right));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
+    ASSERT_EQ(STATUS_OK, rig.step(30, true, &unlock_left));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
+    ASSERT_EQ(STATUS_OK, rig.step(40, true, &unlock_right));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_DRIVER_COMMAND, rig.r().reason);
+}
+
+// FTC-042
+TEST(SystemFunctional, Ftc042SourceIndependent)
+{
+    for (int source = 0; source < 4; ++source)
+    {
+        Rig rig(LOCK_RELEASE);
+        const raw_command_t command = {
+            {true, 2.0}, {true, 0.0}, {true, static_cast<double>(source)}};
+        ASSERT_EQ(STATUS_OK, rig.step(10, true, &command));
+        EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+        EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
+        EXPECT_EQ(REASON_DRIVER_COMMAND, rig.r().reason);
+        EXPECT_EQ(COMMAND_ACCEPTED, rig.r().command_status);
+    }
+}
+
+// FTC-043
+TEST(SystemFunctional, Ftc043AutoLockBlocksUnlockCommand)
+{
+    Rig rig(LOCK_LOCK);
+    rig.set(ITEM_VEHICLE_SPEED, 10.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10, true, &kUnlockAll));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
+    EXPECT_EQ(REASON_AUTO_LOCK, rig.r().reason);
+}
+
+// FTC-044
+TEST(SystemFunctional, Ftc044AdultBeatsApproachRisk)
+{
+    Rig rig(LOCK_LOCK);
+    rig.set(ITEM_ADULT_PRESENT, 1.0);
+    rig.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_ADULT_PRESENT, rig.r().reason);
+}
+
+// FTC-045
+TEST(SystemFunctional, Ftc045CommandDroppedUnderGlobalRule)
+{
+    Rig rig(LOCK_LOCK);
+    rig.set(ITEM_SENSOR_FAULT, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10, true, &kUnlockAll));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(REASON_SENSOR_FAULT, rig.r().reason);
+    rig.set(ITEM_SENSOR_FAULT, 0.0);
+    ASSERT_EQ(STATUS_OK, rig.step(20));
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
+    EXPECT_EQ(REASON_NONE, rig.r().reason);
 }
 
 // NTC-001
