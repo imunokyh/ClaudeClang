@@ -34,6 +34,7 @@ pipeline {
             }
         }
 
+        stage('Self test')    { steps { gate('selftest') } }
         stage('Format')       { steps { gate('format') } }
         stage('Build')        { steps { gate('build') } }
         stage('Rules')        { steps { gate('rules') } }          // 반환 규칙, 인터페이스 경유 접근

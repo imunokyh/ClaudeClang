@@ -4,7 +4,7 @@
 
 | 산출물 (단계) | 경로 | 정의하는 ID | 반드시 연결할 상위 ID |
 |---|---|---|---|
-| 요구사항 (SWE.1) | `docs/swe1/*.md` | `REQ-F/Q/L/C-nnn`, `SAF-nnn` | (원 요구사항 — 자유 형식 `출처` 열) |
+| 요구사항 (SWE.1) | `docs/swe1/*.md` | `REQ-F/Q/L/C-nnn` 또는 `SWR-nnn`(OEM이 번호를 정한 경우, 분류는 `분류` 열), `SAF-nnn` | (원 요구사항 — 자유 형식 `출처` 열) |
 | 아키텍처 (SWE.2) | `docs/swe2/*.md` | `CMP-nnn`(컴포넌트), `IF-nnn`(컴포넌트 인터페이스) | `REQ-*`, `SAF-*` |
 | 상세 설계 (SWE.3) | `docs/swe3/*.md` | `MOD-nnn`(모듈), `MIF-nnn`(모듈 인터페이스), `FN-nnn`(함수) | `CMP-*`, `IF-*` (FN은 같은 행에 `MOD-*`도) |
 | 구현 (SWE.3) | `src/**/*.[ch]` | — (Doxygen `@trace FN-nnn`) | `FN-*` |
@@ -24,7 +24,7 @@ SW 검증(SWE.6) 테스트 케이스는 `system-test-case-generator` 스킬이 �
 ```
 
 - **첫 열**이 정의되는 ID다(접두어 하나). 같은 ID를 두 행에서 정의하면 오류다.
-- ID는 정규식 `\b(REQ-[FQLC]|SAF|CMP|IF|MOD|MIF|FN|UT|IT)-\d{3}\b`로 인식한다. 코드 블록 안의 표는 무시한다.
+- ID는 정규식 `(?<![\w-])(REQ-[FQLC]|SWR|SAF|CMP|IF|MOD|MIF|FN|UT|IT)-\d{3}(?!\d)`로 인식한다(앞에 문자·숫자·하이픈이 붙은 `OEM-IF-001` 같은 상위 문서 ID는 무시). 코드 블록 안의 표는 무시한다.
 - 한 행에 여러 ID를 쉼표로 쓴다. 범위 표기(`REQ-F-001~005`)는 인식하지 못하므로 쓰지 않는다.
 
 ## 검사 규칙 (`scripts/trace_check.py`)
@@ -44,6 +44,7 @@ SW 검증(SWE.6) 테스트 케이스는 `system-test-case-generator` 스킬이 �
 | T9 | 모든 `FN-*`는 `src/`의 `@trace FN-nnn` 주석에 나타난다 | 정방향 |
 | T10 | `src/`의 `@trace`에 쓴 FN ID는 상세 설계에 존재한다 | 역방향 |
 | T11 | 한 ID를 두 행에서 정의하지 않는다. 존재하지 않는 ID를 연결하지 않는다 | 일관성 |
+| T13 | 범위 표기(`SWR-021~025`)를 쓰지 않는다. ID를 하나씩 쓴다 | 일관성 |
 | T12 | 안전 요구사항(`SAF-*`)은 `docs/swe1/safety-requirements.md`에서만 정의한다. 다른 파일에 정의되면 오류 | 분리 |
 
 `--stage swe1`은 T11, T12만, `--stage swe2`는 T1~T2까지(=swe1+swe2), 이런 식으로 해당 단계까지만 검사한다(`swe1`, `swe2`, `swe3`, `swe3-impl`(T9, T10 포함), `swe4`, `swe5`, `all`). 아직 만들지 않은 하위 단계 때문에 실패하지 않게 하기 위해서다.
