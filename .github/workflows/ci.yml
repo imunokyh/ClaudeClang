@@ -66,6 +66,11 @@ jobs:
       - { name: 추적성,                 if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" trace' }
       - { name: 시스템 테스트 (요구사항 커버리지 100%), if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" system' }
 
+      - name: 보고서 읽기 권한 정리
+        if: always()
+        # 컨테이너가 root로 만든 보고서(llvm-cov HTML 등)를 러너 사용자가 읽을 수 있게 한다.
+        run: sudo chmod -R a+rX build || true
+
       - name: 요약
         if: always()
         run: |
