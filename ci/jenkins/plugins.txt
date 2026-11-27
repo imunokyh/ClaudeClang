@@ -1,0 +1,23 @@
+# 파이프라인
+workflow-aggregator
+pipeline-stage-view
+pipeline-graph-view
+git
+github-branch-source
+timestamper
+ws-cleanup
+build-timeout
+credentials-binding
+ansicolor
+# 테스트 결과 (GoogleTest XML → JUnit)
+junit
+# 정적 분석·컴파일러 경고·복잡도 (Cppcheck, Clang, Lizard)
+warnings-ng
+# 커버리지
+coverage
+# HTML 보고서 (Doxygen, Cppcheck, Lizard, LLVM 커버리지), 주석률 추이
+htmlpublisher
+plot
+# 설정을 코드로 (사용자, 보안, 작업)
+configuration-as-code
+job-dsl

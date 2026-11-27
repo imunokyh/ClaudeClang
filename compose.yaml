@@ -1,0 +1,34 @@
+# 개발·CI 공용 빌드 컨테이너. 사용 예: docker compose run --rm dev <명령>
+# 이미지 이름은 ClaudeCLangBuild 이다. Docker 가 대문자를 허용하지 않으므로 소문자로 쓴다.
+services:
+  dev:
+    build:
+      context: docker
+    image: claudeclangbuild:latest
+    working_dir: /work
+    volumes:
+      - .:/work
+    # 호스트(Windows)와 공유하는 소스에 root 소유 파일이 생기지 않도록 빌드 산출물은 build/ 아래에만 만든다.
+    tty: true
+    stdin_open: true
+
+  # CI 서버: Jenkins LTS. 사용법: docker compose up -d --build jenkins  →  http://localhost:8080
+  # 호스트 Docker 소켓을 쓰므로 빌드 컨테이너(claudeclangbuild)는 호스트 Docker 위에서 실행된다.
+  # 소켓 접근을 위해 root 로 실행한다. 이 PC 안에서만 쓰는 로컬 CI 설정이다.
+  jenkins:
+    build:
+      context: ci/jenkins
+    image: claudeclang-jenkins:lts
+    container_name: claudeclang-jenkins
+    user: root
+    ports:
+      - "8080:8080"
+    env_file:
+      - ci/jenkins.env
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

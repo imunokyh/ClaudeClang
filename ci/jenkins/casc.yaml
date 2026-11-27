@@ -1,0 +1,66 @@
+# Jenkins Configuration as Code. 컨테이너가 시작할 때 적용된다.
+# 관리자 계정은 환경 변수(JENKINS_ADMIN_ID, JENKINS_ADMIN_PASSWORD)로 받는다 (ci/jenkins.env, 저장소에 커밋하지 않음).
+jenkins:
+  systemMessage: "ClaudeClang CI — 개발과 같은 claudeclangbuild 이미지로 빌드합니다."
+  numExecutors: 2
+  scmCheckoutRetryCount: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID:-admin}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+unclassified:
+  location:
+    url: "http://localhost:8080/"
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          # GitHub API 토큰 (선택). ci/jenkins.env 의 GITHUB_USER, GITHUB_TOKEN 값을 쓴다. 저장소에는 값을 넣지 않는다.
+          # 토큰이 있어야 익명 API 한도(시간당 60회)를 넘지 않고, PR 빌드 결과를 GitHub 상태 검사로 돌려줄 수 있다.
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github-token"
+              username: "${GITHUB_USER:-unused}"
+              password: "${GITHUB_TOKEN:-unused}"
+              description: "GitHub API token (ci/jenkins.env)"
+jobs:
+  - script: >
+      multibranchPipelineJob('ClaudeClang') {
+        description('ClaudeClang CI — 브랜치와 PR마다 Jenkinsfile 을 실행한다 (개발과 같은 claudeclangbuild 이미지).')
+        branchSources {
+          github {
+            id('claudeclang-github')
+            repoOwner('imunokyh')
+            repository('ClaudeClang')
+            // 브랜치(feature/develop/release/hotfix/master)와, 병합 결과로 빌드하는 PR을 모두 빌드한다.
+            buildOriginBranch(true)
+            buildOriginBranchWithPR(false)
+            buildOriginPRMerge(true)
+            // 토큰을 설정한 경우에만 인증해서 스캔한다 (없으면 익명).
+            if (System.getenv('GITHUB_TOKEN')) {
+              scanCredentialsId('github-token')
+            }
+          }
+        }
+        factory {
+          workflowBranchProjectFactory {
+            scriptPath('Jenkinsfile')
+          }
+        }
+        orphanedItemStrategy {
+          discardOldItems {
+            numToKeep(20)
+          }
+        }
+        // 사내 PC라 GitHub webhook 을 쓸 수 없어서 주기적으로 저장소를 확인한다.
+        triggers {
+          periodicFolderTrigger {
+            interval('5m')
+          }
+        }
+      }

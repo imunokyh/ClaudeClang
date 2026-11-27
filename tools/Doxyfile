@@ -1,0 +1,35 @@
+# Doxygen 설정. tools/run.sh docs 가 실행한다. 주석 형식 오류와 문서화 누락을 경고로 잡고, 경고는 실패다.
+PROJECT_NAME           = "ClaudeClang"
+OUTPUT_DIRECTORY       = build/reports/doxygen
+INPUT                  = src
+FILE_PATTERNS          = *.c *.h
+RECURSIVE              = YES
+EXTRACT_ALL            = NO
+EXTRACT_STATIC         = YES
+OPTIMIZE_OUTPUT_FOR_C  = YES
+OUTPUT_LANGUAGE        = English
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+QUIET                  = YES
+
+# 문서화 누락, 형식 오류, @param 누락을 모두 경고로 보고하고 경고가 있으면 실패한다.
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
+WARN_FORMAT            = "$file:$line: $text"
+
+# 프로젝트 전용 태그: @trace FN-nnn 을 "추적" 문단으로 렌더링한다.
+ALIASES                = "trace=@par 추적^^"
+
+# Graphviz 그림은 만들지 않는다 (이미지에 설치하지 않음)
+HAVE_DOT               = NO
+CLASS_GRAPH            = NO
+COLLABORATION_GRAPH    = NO
+INCLUDE_GRAPH          = NO
+INCLUDED_BY_GRAPH      = NO
+CALL_GRAPH             = NO
+CALLER_GRAPH           = NO
+GRAPHICAL_HIERARCHY    = NO
+DIRECTORY_GRAPH        = NO

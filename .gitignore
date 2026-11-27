@@ -1,0 +1,13 @@
+# Claude Code 개인 설정
+.claude/settings.local.json
+CLAUDE.local.md
+
+# 빌드 산출물과 보고서 (컨테이너에서 생성)
+build/
+
+# Python (도구·스킬 스크립트)
+__pycache__/
+*.py[cod]
+
+# CI 로컬 비밀 (관리자 비밀번호 등)
+ci/jenkins.env
