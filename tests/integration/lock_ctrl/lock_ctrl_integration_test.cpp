@@ -25,6 +25,7 @@ class Harness
         {
             snapshot_.item[i] = {true, 0.0};
         }
+        snapshot_.item[ITEM_IGNITION_ON] = {true, 1.0}; // 시동 켜짐
     }
 
     /** 스냅샷의 항목 값을 바꾼다. */
@@ -277,26 +278,30 @@ TEST(IntegrationFlow, TimeRegressionKeepsResult)
 
 /**
  * @test IT-008
- * @brief 운전자 명령은 검사 결과만 command_status로 나오고 출력과 state를 바꾸지 않는다 (SWR-033;
- * IF-001).
+ * @brief 유효한 운전자 명령만 적용되고 무효한 명령은 거절되어 출력을 바꾸지 않는다
+ *        (SWR-033, SWR-001; IF-001, IF-002).
  * @par 입력값
- * 초기 출력 LOCK, 유효한 명령, 무효한 명령(side 7), 명령 없음
+ * 초기 출력 LOCK, 유효한 명령(all, unlock), 무효한 명령(side 7), 명령 없음
  * @par 절차
  * 각각 평가
  * @par 예상 출력값
- * ACCEPTED, REJECTED, NONE. 세 경우 모두 출력 LOCK 유지, state NORMAL
+ * ACCEPTED(두 출력 RELEASE, reason DRIVER_COMMAND), REJECTED(직전 출력 RELEASE 유지, reason NONE),
+ * NONE. state는 모두 NORMAL
  */
-TEST(IntegrationFlow, CommandDoesNotChangeOutputs)
+TEST(IntegrationFlow, CommandAppliedOnlyWhenValid)
 {
     Harness h(LOCK_LOCK);
     raw_command_t good = {{true, 2.0}, {true, 1.0}, {true, 0.0}};
     raw_command_t bad = {{true, 7.0}, {true, 0.0}, {true, 0.0}};
     ASSERT_EQ(STATUS_OK, h.step(10, true, &good));
     EXPECT_EQ(COMMAND_ACCEPTED, h.result().command_status);
-    EXPECT_EQ(LOCK_LOCK, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(REASON_DRIVER_COMMAND, h.result().reason);
     ASSERT_EQ(STATUS_OK, h.step(20, true, &bad));
     EXPECT_EQ(COMMAND_REJECTED, h.result().command_status);
-    EXPECT_EQ(LOCK_LOCK, h.result().outputs.right);
+    EXPECT_EQ(LOCK_RELEASE, h.result().outputs.right);
+    EXPECT_EQ(REASON_NONE, h.result().reason);
     ASSERT_EQ(STATUS_OK, h.step(30));
     EXPECT_EQ(COMMAND_NONE, h.result().command_status);
     EXPECT_EQ(STATE_NORMAL, h.result().state);

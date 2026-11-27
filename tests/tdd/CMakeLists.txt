@@ -5,3 +5,8 @@ add_executable(tdd_lock_ctrl lock_ctrl/lock_ctrl_tdd_test.cpp)
 target_include_directories(tdd_lock_ctrl PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(tdd_lock_ctrl PRIVATE cl_product GTest::gtest_main)
 add_test(NAME tdd_lock_ctrl COMMAND tdd_lock_ctrl)
+
+add_executable(tdd_lock_ctrl_iter2 lock_ctrl/lock_ctrl_tdd_iter2_test.cpp)
+target_include_directories(tdd_lock_ctrl_iter2 PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(tdd_lock_ctrl_iter2 PRIVATE cl_product GTest::gtest_main)
+add_test(NAME tdd_lock_ctrl_iter2 COMMAND tdd_lock_ctrl_iter2)

@@ -63,7 +63,16 @@ typedef enum
     REASON_SENSOR_FAULT = 2,
     REASON_INPUT_INVALID = 3,
     REASON_INPUT_STALE = 4,
-    REASON_CRASH_PENDING = 5
+    REASON_CRASH_PENDING = 5,
+    REASON_IGNITION_OFF = 6,
+    REASON_FIRE = 7,
+    REASON_OVERTEMPERATURE = 8,
+    REASON_ADULT_PRESENT = 9,
+    REASON_APPROACH_RISK = 10,
+    REASON_APPROACH_OVERRIDE = 11,
+    REASON_ISOFIX = 12,
+    REASON_AUTO_LOCK = 13,
+    REASON_DRIVER_COMMAND = 14
 } reason_t;
 
 /** 경고 코드. */
@@ -117,6 +126,14 @@ typedef enum
     ITEM_COUNT = 13
 } input_item_t;
 
+/** 문(후석 좌, 우). */
+typedef enum
+{
+    DOOR_LEFT = 0,
+    DOOR_RIGHT = 1,
+    DOOR_COUNT = 2
+} door_t;
+
 /** 검사 전의 입력 값 하나. 단위는 항목마다 다르다(ms, km/h, 열거 번호, 0/1). */
 typedef struct
 {
@@ -160,13 +177,46 @@ typedef struct
     lock_cmd_t right; /**< 우측 후석 */
 } lock_outputs_t;
 
+/** 검사를 거친 운전자 명령. side 와 action 은 status 가 COMMAND_ACCEPTED 일 때만 의미 있다. */
+typedef struct
+{
+    command_status_t status; /**< 명령 처리 상태 */
+    int side;                /**< 0 left, 1 right, 2 all */
+    int action;              /**< 0 lock, 1 unlock */
+} checked_command_t;
+
+/** 문 하나의 접근위험 억제·override 기록. */
+typedef struct
+{
+    bool pending;         /**< 처음 억제된 해제 요청의 기록이 있는가 */
+    bool override_active; /**< override 가 성립해 있는가 */
+    uint32_t pending_ms;  /**< 처음 억제된 시각 (ms) */
+} door_approach_t;
+
+/** 문별 접근위험 기록. lock_ctrl 이 보관하고 arbiter 가 새 기록을 계산한다. */
+typedef struct
+{
+    door_approach_t door[DOOR_COUNT]; /**< 좌, 우 문의 기록 */
+} approach_state_t;
+
+/** arbiter 의 입력. */
+typedef struct
+{
+    const normalized_inputs_t *inputs; /**< 입력 검사를 거친 입력 (NULL 불가) */
+    lock_outputs_t previous;           /**< 직전 확정 출력 */
+    checked_command_t command; /**< 이번 평가의 검사한 명령 (없으면 status 가 COMMAND_NONE) */
+    uint32_t now_ms;           /**< 평가 시각 (ms) */
+    approach_state_t approach; /**< 현재 접근위험 기록 */
+} arbiter_input_t;
+
 /** arbiter 의 판정 결과. */
 typedef struct
 {
-    lock_outputs_t outputs; /**< 확정한 출력 */
-    ctrl_state_t state;     /**< 제어 상태 */
-    reason_t reason;        /**< 결정 이유 */
-    warning_t warning;      /**< 경고 코드 */
+    lock_outputs_t outputs;    /**< 확정한 출력 */
+    ctrl_state_t state;        /**< 제어 상태 */
+    reason_t reason;           /**< 결정 이유 */
+    warning_t warning;         /**< 경고 코드 */
+    approach_state_t approach; /**< 새 접근위험 기록 */
 } decision_t;
 
 /** lock_ctrl 초기화 설정. 초기 출력 지정은 시험 지원 목적이다(SWR-039). */
@@ -193,6 +243,7 @@ typedef struct
     warning_t warning;                     /**< 경고 코드 */
     command_status_t command_status;       /**< 운전자 명령 처리 상태 */
     validity_t input_validity[ITEM_COUNT]; /**< 입력 항목별 입력 상태 */
+    bool override_active[DOOR_COUNT];      /**< 문별 override 성립 여부 */
 } lock_ctrl_result_t;
 
 #ifdef __cplusplus

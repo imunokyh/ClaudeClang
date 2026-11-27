@@ -16,6 +16,8 @@ raw_snapshot_t make_valid_snapshot(int64_t timestamp_ms)
     {
         snapshot.item[i] = {true, 0.0};
     }
+    snapshot.item[ITEM_IGNITION_ON] = {true,
+                                       1.0}; // 시동 켜짐(이터레이션 2부터 FALSE는 ignition off)
     snapshot.item[ITEM_SOURCE_TIMESTAMP] = {true, static_cast<double>(timestamp_ms)};
     return snapshot;
 }

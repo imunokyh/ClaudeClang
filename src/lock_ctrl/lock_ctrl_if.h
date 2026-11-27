@@ -24,6 +24,7 @@ typedef struct
 {
     input_guard_t guard;       /**< 입력 상태 저장소 */
     lock_outputs_t outputs;    /**< 직전 확정 출력 */
+    approach_state_t approach; /**< 문별 접근위험 억제·override 기록 */
     uint32_t last_now_ms;      /**< 직전에 받아들여진 평가의 now_ms */
     bool has_evaluated;        /**< 받아들여진 평가가 있는가 */
     lock_ctrl_result_t result; /**< 마지막 결과 (초기화 직후에는 초기 결과) */
@@ -40,9 +41,7 @@ typedef struct
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 완료
- * - 리뷰어: imunokyh
- * - 일시: 2026-11-27
+ * - 상태: 미완료
  */
 NODISCARD status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config);
 

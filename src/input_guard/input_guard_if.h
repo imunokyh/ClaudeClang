@@ -65,21 +65,19 @@ NODISCARD status_t input_guard_update(input_guard_t *guard, uint32_t now_ms,
                                       const raw_snapshot_t *snapshot, normalized_inputs_t *out);
 
 /**
- * @brief 운전자 명령의 유효성을 검사해 명령 상태를 정한다.
+ * @brief 운전자 명령의 유효성을 검사하고 검사한 명령(상태, side, action)을 낸다.
  * @trace FN-003
  * @param command 운전자 명령 (NULL 불가. 명령이 없으면 호출하지 않는다)
- * @param out 출력: COMMAND_ACCEPTED 또는 COMMAND_REJECTED (NULL 불가)
+ * @param out 출력: 상태 COMMAND_ACCEPTED 또는 COMMAND_REJECTED 와 side, action (NULL 불가)
  * @return STATUS_OK, STATUS_ERR_PARAM (command 또는 out 이 NULL)
  * @par AI 작성
  * - 모델: claude-sonnet-5-5
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 완료
- * - 리뷰어: imunokyh
- * - 일시: 2026-11-27
+ * - 상태: 미완료
  */
-NODISCARD status_t input_guard_check_command(const raw_command_t *command, command_status_t *out);
+NODISCARD status_t input_guard_check_command(const raw_command_t *command, checked_command_t *out);
 
 #ifdef __cplusplus
 }

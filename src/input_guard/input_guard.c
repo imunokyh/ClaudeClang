@@ -435,31 +435,35 @@ status_t input_guard_update(input_guard_t *guard, uint32_t now_ms, const raw_sna
 }
 
 /**
- * @brief 운전자 명령의 유효성을 검사해 명령 상태를 정한다.
+ * @brief 운전자 명령의 유효성을 검사하고 검사한 명령(상태, side, action)을 낸다.
  * @trace FN-003
  * @param command 운전자 명령 (NULL 불가. 명령이 없으면 호출하지 않는다)
- * @param out 출력: COMMAND_ACCEPTED 또는 COMMAND_REJECTED (NULL 불가)
+ * @param out 출력: 상태 COMMAND_ACCEPTED 또는 COMMAND_REJECTED 와 side, action (NULL 불가)
  * @return STATUS_OK, STATUS_ERR_PARAM (command 또는 out 이 NULL)
  * @par AI 작성
  * - 모델: claude-sonnet-5-5
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 완료
- * - 리뷰어: imunokyh
- * - 일시: 2026-11-27
+ * - 상태: 미완료
  */
-status_t input_guard_check_command(const raw_command_t *command, command_status_t *out)
+status_t input_guard_check_command(const raw_command_t *command, checked_command_t *out)
 {
     status_t status = STATUS_ERR_PARAM;
 
     if ((command != NULL) && (out != NULL))
     {
-        int64_t unused = 0;
-        const bool side_ok = validate_integer_range(&command->side, 0.0, SIDE_MAX, &unused);
-        const bool action_ok = validate_integer_range(&command->action, 0.0, ACTION_MAX, &unused);
-        const bool source_ok = validate_integer_range(&command->source, 0.0, SOURCE_MAX, &unused);
-        *out = (side_ok && action_ok && source_ok) ? COMMAND_ACCEPTED : COMMAND_REJECTED;
+        int64_t side = 0;
+        int64_t action = 0;
+        int64_t source = 0;
+        const bool side_ok = validate_integer_range(&command->side, 0.0, SIDE_MAX, &side);
+        const bool action_ok = validate_integer_range(&command->action, 0.0, ACTION_MAX, &action);
+        const bool source_ok = validate_integer_range(&command->source, 0.0, SOURCE_MAX, &source);
+        const bool accepted = side_ok && action_ok && source_ok;
+
+        out->status = accepted ? COMMAND_ACCEPTED : COMMAND_REJECTED;
+        out->side = accepted ? (int)side : 0;
+        out->action = accepted ? (int)action : 0;
         status = STATUS_OK;
     }
 

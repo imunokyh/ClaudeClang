@@ -26,6 +26,7 @@ class Rig
         {
             snapshot_.item[i] = {true, 0.0};
         }
+        snapshot_.item[ITEM_IGNITION_ON] = {true, 1.0}; // 시동 켜짐
     }
 
     void set(input_item_t item, double value)
@@ -410,8 +411,9 @@ TEST(SystemFunctional, Ftc025CommandAccepted)
     raw_command_t command = {{true, 2.0}, {true, 1.0}, {true, 2.0}};
     ASSERT_EQ(STATUS_OK, rig.step(10, true, &command));
     EXPECT_EQ(COMMAND_ACCEPTED, rig.r().command_status);
-    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
-    EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, rig.r().outputs.right);
+    EXPECT_EQ(REASON_DRIVER_COMMAND, rig.r().reason);
     EXPECT_EQ(STATE_NORMAL, rig.r().state);
 }
 
