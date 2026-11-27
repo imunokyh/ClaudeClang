@@ -1,7 +1,7 @@
 # SW 통합 테스트 명세
 
-- 대상 SW: 전자식 차일드락 제어 SW   버전: 0.2 (이터레이션 1~2)   일자: 2026-11-27
-- 입력: docs/swe2/architecture.md (v0.2) 3절 인터페이스, 7절 동적 동작
+- 대상 SW: 전자식 차일드락 제어 SW   버전: 0.3 (이터레이션 1~3)   일자: 2026-11-27
+- 입력: docs/swe2/architecture.md (v0.3) 3절 인터페이스, 7절 동적 동작
 - 테스트 코드: `tests/integration/` (GoogleTest). 실제 컴포넌트(`lock_ctrl`, `input_guard`, `arbiter`, `common`)를 모두 연결하고, 호출자(차량 신호 어댑터) 역할의 시험 하네스가 IF-003을 호출한다.
 - 기준: 테스트 성공률 100%, 함수 커버리지 100% (모든 `src/` 파일)
 - 스텁: 없음. 이 SW 안에는 HW·OS 호출이 없어 아키텍처 6절의 경계는 호출자(시험 하네스)와 고정 시계(now_ms 인자)뿐이다.
@@ -31,6 +31,11 @@
 | IT-018 | IF-002 | lock_ctrl_integration_test: IntegrationDoorRules.IsofixAutoLockAndCommandPriority | 문 규칙 우선순위의 지속 | 시나리오 | ISOFIX, 주행, 정지 후 명령 | LOCK 유지, 명령 해제 |
 | IT-019 | IF-001, IF-002 | lock_ctrl_integration_test: IntegrationDoorRules.CommandDroppedUnderGlobalRule | 전역 규칙 아래 명령 버림 | 오류 주입 | sensor_fault + 명령 | 유지, 이어지지 않음 |
 | IT-020 | IF-001, IF-002 | lock_ctrl_integration_test: IntegrationDoorRules.SourceDoesNotMatter | source 무관 | 동치 클래스 | source 0~3 | 같은 결과 |
+| IT-021 | IF-003, IF-005 | lock_ctrl_integration_test: IntegrationStatusView.ReflectsEvaluationResult | 조회와 직렬화 연동 | 시나리오 | 접근위험, override, STALE | 문자열에 결과가 반영 |
+| IT-022 | IF-005 | lock_ctrl_integration_test: IntegrationStatusView.SmallBufferFails | 버퍼 부족 | 오류 주입 | 크기 10 버퍼 | STATUS_ERR_BUFFER, 빈 문자열 |
+| IT-023 | IF-003, IF-006 | lock_ctrl_integration_test: IntegrationDecisionLog.RecordsDecisionChanges | 결정 변화 이력 | 시나리오 | fault, 반복, 충돌, 복귀 | 변화만 3건, ID와 필드 일치 |
+| IT-024 | IF-003, IF-006 | lock_ctrl_integration_test: IntegrationDecisionLog.KeepsLatestHundredAndResets | 100건 보존과 초기화 | 경계값 | 결정 변화 101번, 초기화 | 최신 100건, 초기화 후 0건 |
+| IT-025 | IF-001, IF-002 | lock_ctrl_integration_test: IntegrationDoorRules.GeneralReleaseAllowedOnlyWithoutBlockers | 일반 해제 허용 조건 | 결정 테이블 | 차단 조건 5조합 | 차단 시 유지, 없으면 해제 |
 
 ## 2. 개정 이력
 
@@ -38,3 +43,4 @@
 |---|---|---|---|---|
 | 0.1 | 2026-11-27 | IT-001, IT-002, IT-003, IT-004, IT-005, IT-006, IT-007, IT-008, IT-009, IT-010, IT-011, IT-012, IT-013 | 이터레이션 1 최초 작성 (단계 리뷰는 사용자 지시로 생략) | 없음 |
 | 0.2 | 2026-11-27 | IT-008, IT-014, IT-015, IT-016, IT-017, IT-018, IT-019, IT-020 | 이터레이션 2: 운전자 명령 적용(IT-008 수정), 문 규칙·전역 해제·override 통합 시험 추가 | 아키텍처 설계서 |
+| 0.3 | 2026-11-27 | IT-021, IT-022, IT-023, IT-024, IT-025 | 이터레이션 3: 직렬화, 이력, 일반 해제 허용 조건 통합 시험 추가 | 아키텍처 설계서 |

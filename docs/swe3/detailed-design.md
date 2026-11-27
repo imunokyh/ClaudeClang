@@ -1,7 +1,7 @@
 # SW 상세 설계서
 
-- 대상 SW: 전자식 차일드락 제어 SW (후석 좌, 우)   버전: 0.3 (이터레이션 1~2)   일자: 2026-11-27
-- 입력: docs/swe2/architecture.md (v0.2)
+- 대상 SW: 전자식 차일드락 제어 SW (후석 좌, 우)   버전: 0.5 (이터레이션 1~3)   일자: 2026-11-27
+- 입력: docs/swe2/architecture.md (v0.3)
 - 면책: 교육용 가상 OEM 입력에 대한 설계이며 준수·인증·ASIL 달성을 주장하지 않는다.
 - 인터페이스 필수 기준: M1 호출됨 / M2 공개 함수 3개 이상 / M3 안전 요구 구현 / M4 상태 소유 (detailed-design 스킬 기준)
 - 컴포넌트마다 모듈 하나를 두고(컴포넌트가 작아 더 쪼개면 SRP가 아니라 파편화가 된다), 모듈 안의 비공개 함수는 `static`이다. 모든 모듈은 M1(호출됨), M3 또는 M4에 해당하므로 인터페이스를 가진다.
@@ -14,6 +14,8 @@
 | MOD-002 | arbiter (`src/arbiter/`) | 정규화된 입력과 직전 확정 출력으로 규칙표에 따라 출력, state, 결정 이유, 경고를 정한다 | 없음 | 예 (M1, M3) | CMP-002 |
 | MOD-003 | lock_ctrl (`src/lock_ctrl/`) | 평가 순서를 지휘하고 직전 확정 출력을 보관해 결과를 낸다 | `lock_ctrl_t`(직전 확정 출력, 직전 now_ms, 마지막 결과, input_guard_t) | 예 (M1, M3, M4) | CMP-003 |
 | MOD-004 | common (`src/common/`) | 공유 타입과 상수를 정의한다 | 없음 | 예 (M1, 공유 타입 헤더) | CMP-004 |
+| MOD-005 | status_view (`src/status_view/`) | 조회 결과를 JSON 문자열로 직렬화한다 | 없음 | 예 (M1, 호출됨) | CMP-005 |
+| MOD-006 | decision_log (`src/decision_log/`) | 제어 결정 이력을 링 버퍼로 보존하고 조회하게 한다 | `decision_log_t`(항목 100개, 건수, 쓰기 위치, 다음 ID) | 예 (M1, M4) | CMP-006 |
 
 ## 2. 모듈 인터페이스
 
@@ -23,6 +25,8 @@
 | MIF-002 | `arbiter_if.h` | MOD-002 | MOD-003 | IF-002 | CMP-002, IF-002 |
 | MIF-003 | `lock_ctrl_if.h` | MOD-003 | 호출자(범위 밖) | IF-003 | CMP-003, IF-003 |
 | MIF-004 | `types_if.h` | MOD-004 | MOD-001, MOD-002, MOD-003 | IF-004 | CMP-004, IF-004 |
+| MIF-005 | `status_view_if.h` | MOD-005 | 호출자(범위 밖) | IF-005 | CMP-005, IF-005 |
+| MIF-006 | `decision_log_if.h` | MOD-006 | MOD-003 | IF-006 | CMP-006, IF-006 |
 
 ## 3. 함수
 
@@ -65,6 +69,19 @@
 | FN-034 | `static bool is_speed_at_least(const normalized_inputs_t *inputs, int64_t threshold)` | MOD-002 | 아니오 | 차속 판정 값이 기준 이상인지 판정한다 | MOD-002, CMP-002 |
 | FN-035 | `static reason_t apply_fallback_reason(const normalized_inputs_t *inputs, reason_t reason)` | MOD-002 | 아니오 | 문 규칙이 없어 이유가 NONE이면 충돌 PENDING 이유를 적용한다 | MOD-002, CMP-002 |
 | FN-036 | `static lock_cmd_t get_door_output(const lock_outputs_t *outputs, door_t door)` | MOD-002 | 아니오 | 문의 출력 값을 꺼낸다 | MOD-002, CMP-002 |
+| FN-037 | `status_t status_view_format(const lock_ctrl_result_t *result, char *buffer, size_t size)` | MOD-005 | 예 | 조회 결과를 널 종료 JSON 문자열로 직렬화한다 | MOD-005, CMP-005, IF-005 |
+| FN-038 | `static const char *name_of(const char *const *names, int count, int value)` | MOD-005 | 아니오 | 열거값의 이름을 낸다(범위 밖이면 "UNKNOWN") | MOD-005, CMP-005 |
+| FN-039 | `static int fill_scalar_pieces(const lock_ctrl_result_t *result, const char **pieces)` | MOD-005 | 아니오 | 출력·이유·상태 등 스칼라 필드의 문자열 조각을 채우고 조각 수를 낸다 | MOD-005, CMP-005 |
+| FN-040 | `static int fill_validity_pieces(const lock_ctrl_result_t *result, const char **pieces)` | MOD-005 | 아니오 | 입력 항목별 입력 상태의 문자열 조각을 채우고 조각 수를 낸다 | MOD-005, CMP-005 |
+| FN-041 | `static status_t join_pieces(const char *const *pieces, int count, char *buffer, size_t size)` | MOD-005 | 아니오 | 조각을 이어 버퍼에 쓰고, 부족하면 빈 문자열과 STATUS_ERR_BUFFER를 낸다 | MOD-005, CMP-005 |
+| FN-042 | `status_t decision_log_init(decision_log_t *log)` | MOD-006 | 예 | 이력을 비우고 이벤트 ID를 1로 되돌린다 | MOD-006, CMP-006, IF-006 |
+| FN-043 | `status_t decision_log_append(decision_log_t *log, const decision_entry_t *entry)` | MOD-006 | 예 | 이력에 1건을 추가하고 이벤트 ID를 부여하며 100건을 넘으면 가장 오래된 것을 덮어쓴다 | MOD-006, CMP-006, IF-006 |
+| FN-044 | `status_t decision_log_count(const decision_log_t *log, uint32_t *count)` | MOD-006 | 예 | 보존 중인 이력 건수를 낸다 | MOD-006, CMP-006, IF-006 |
+| FN-045 | `status_t decision_log_get(const decision_log_t *log, uint32_t index, decision_entry_t *out)` | MOD-006 | 예 | 오래된 것부터 센 index번째 항목을 낸다 | MOD-006, CMP-006, IF-006 |
+| FN-046 | `static bool is_decision_change(const lock_ctrl_result_t *previous, const lock_ctrl_result_t *next)` | MOD-003 | 아니오 | 출력, state, 결정 이유 중 하나가 달라졌는지 판정한다 | MOD-003, CMP-003 |
+| FN-047 | `status_t lock_ctrl_get_log_count(const lock_ctrl_t *ctrl, uint32_t *count)` | MOD-003 | 예 | 이력 건수를 조회한다 | MOD-003, CMP-003, IF-003 |
+| FN-048 | `status_t lock_ctrl_get_log_entry(const lock_ctrl_t *ctrl, uint32_t index, decision_entry_t *entry)` | MOD-003 | 예 | 이력 항목을 오래된 것부터 조회한다 | MOD-003, CMP-003, IF-003 |
+| FN-049 | `static status_t record_decision(lock_ctrl_t *ctrl, const lock_ctrl_result_t *built, uint32_t now_ms)` | MOD-003 | 아니오 | 결정이 바뀌었으면 이력에 추가한다 | MOD-003, CMP-003 |
 | FN-028 | `static bool is_valid_initial_outputs(const lock_outputs_t *outputs)` | MOD-003 | 아니오 | 초기 출력의 두 값이 모두 열거 범위 안인지 판정한다 | MOD-003, CMP-003 |
 
 ### 3.1 공통 설계 사항
@@ -334,10 +351,103 @@
 | R1 | T | outputs->left |
 | R2 | F | outputs->right |
 
+### FN-037 `status_view_format`
+- **매개변수**: `result` 읽기 전용(NULL 불가), `buffer` 출력(NULL 불가), `size` 버퍼 크기(1 이상)
+- **반환값**: `STATUS_OK`, `STATUS_ERR_PARAM`(result 또는 buffer가 NULL이거나 size가 0), `STATUS_ERR_BUFFER`(버퍼 부족, 이때 `buffer[0]`는 널 문자)
+- **알고리즘**: 조각 배열(`const char *pieces[128]`)에 FN-039, FN-040으로 조각을 채우고 `join_pieces`(FN-041)로 이어 쓴다. 형식은 요구사항 5.6절이다.
+
+| 규칙 | C1 result != NULL | C2 buffer != NULL | C3 size > 0 | 결과 |
+|---|---|---|---|---|
+| R1 | F | - | - | STATUS_ERR_PARAM |
+| R2 | T | F | - | STATUS_ERR_PARAM |
+| R3 | T | T | F | STATUS_ERR_PARAM |
+| R4 | T | T | T | 직렬화(STATUS_OK 또는 STATUS_ERR_BUFFER) |
+
+### FN-038 `name_of`
+| 규칙 | C1 `value >= 0` | C2 `value < count` | 결과 |
+|---|---|---|---|
+| R1 | T | T | `names[value]` |
+| R2 | F | - | "UNKNOWN" |
+| R3 | T | F | "UNKNOWN" |
+
+### FN-039 `fill_scalar_pieces`
+- 조각 순서: `{"lock_left":"`, 이름, `","lock_right":"`, 이름, `","state":"`, 이름, `","priority_reason":"`, 이름, `","reason_code":"`, 이름, `","warning_code":"`, 이름, `","command_status":"`, 이름, `","override_left":`, `true` 또는 `false`, `,"override_right":`, `true` 또는 `false`, `,"input_validity":{`. 이름은 `name_of`로 얻는다. 조각 수를 반환한다. boolean 문자열은 값이 참이면 `true`, 거짓이면 `false`다(단일 조건).
+
+### FN-040 `fill_validity_pieces`
+- 입력 항목 i = 0~`ITEM_COUNT-1`마다 조각 `"`(i가 0) 또는 `,"`(그 밖), 항목 이름, `":"`, 입력 상태 이름, `"` 를 채우고, 마지막에 `}}`를 채운다. 조각 수를 반환한다.
+
+| 규칙 | C1 `i == 0` | 구분 조각 |
+|---|---|---|
+| R1 | T | `"` |
+| R2 | F | `,"` |
+
+### FN-041 `join_pieces`
+- 조각 길이의 합 `total`을 구한다. 합이 `size - 1` 이하(`total < size`)이면 모두 복사하고 널 문자를 붙여 `STATUS_OK`, 아니면 `buffer[0]`을 널 문자로 하고 `STATUS_ERR_BUFFER`.
+
+| 규칙 | C1 `total < size` | 결과 |
+|---|---|---|
+| R1 | T | 복사, STATUS_OK |
+| R2 | F | 빈 문자열, STATUS_ERR_BUFFER |
+
+### FN-042 `decision_log_init`
+- `log`가 NULL이면 `STATUS_ERR_PARAM`. 아니면 `count=0`, `head=0`, `next_id=1`, 항목은 0으로 채우고 `STATUS_OK`.
+
+### FN-043 `decision_log_append`
+- `log`와 `entry`가 NULL이 아니면 `entries[head] = *entry`, `entries[head].event_id = next_id`, `head = (head + 1) % 100`, `count`가 100 미만이면 1 증가, `next_id`를 1 증가하고 `STATUS_OK`. 아니면 `STATUS_ERR_PARAM`(변경 없음).
+
+| 규칙 | C1 log != NULL | C2 entry != NULL | C3 `count < 100` | 결과 |
+|---|---|---|---|---|
+| R1 | F | - | - | STATUS_ERR_PARAM |
+| R2 | T | F | - | STATUS_ERR_PARAM |
+| R3 | T | T | T | 추가, count 증가 |
+| R4 | T | T | F | 가장 오래된 항목 덮어씀, count 100 유지 |
+
+### FN-044 `decision_log_count`
+| 규칙 | C1 log != NULL | C2 count != NULL | 결과 |
+|---|---|---|---|
+| R1 | T | T | `*count = log->count`, STATUS_OK |
+| R2 | F | - | STATUS_ERR_PARAM |
+| R3 | T | F | STATUS_ERR_PARAM |
+
+### FN-045 `decision_log_get`
+- 가장 오래된 항목의 위치 `start = (head + 100 - count) % 100`, 결과는 `entries[(start + index) % 100]`.
+
+| 규칙 | C1 log != NULL | C2 out != NULL | C3 `index < count` | 결과 |
+|---|---|---|---|---|
+| R1 | T | T | T | 항목 복사, STATUS_OK |
+| R2 | F | - | - | STATUS_ERR_PARAM |
+| R3 | T | F | - | STATUS_ERR_PARAM |
+| R4 | T | T | F | STATUS_ERR_PARAM (출력 불변) |
+
+### FN-046 `is_decision_change`
+| 규칙 | C1 left 다름 | C2 right 다름 | C3 state 다름 | C4 reason 다름 | 결과 |
+|---|---|---|---|---|---|
+| R1 | T | - | - | - | true |
+| R2 | F | T | - | - | true |
+| R3 | F | F | T | - | true |
+| R4 | F | F | F | T | true |
+| R5 | F | F | F | F | false |
+
+### FN-047 `lock_ctrl_get_log_count` / FN-048 `lock_ctrl_get_log_entry`
+- `ctrl`이 NULL이면 `STATUS_ERR_PARAM`, 아니면 `decision_log_count`/`decision_log_get`의 결과를 그대로 반환한다.
+
+| 규칙 | C1 ctrl != NULL | 결과 |
+|---|---|---|
+| R1 | T | 이력 조회 결과 |
+| R2 | F | STATUS_ERR_PARAM |
+
+### FN-049 `record_decision`
+- `is_decision_change(&ctrl->result, built)`가 참이면 이력 항목(`event_id`는 이력이 부여, `now_ms`, 출력, state, reason, warning)을 만들어 `decision_log_append`를 호출하고 그 상태를 반환한다. 아니면 `STATUS_OK`. 호출 시점의 `ctrl->result`는 직전 결과다.
+
+| 규칙 | C1 결정이 바뀜 (FN-046) | 결과 |
+|---|---|---|
+| R1 | T | append 결과 |
+| R2 | F | STATUS_OK, 이력 불변 |
+
 ### FN-020 `lock_ctrl_init`
 - **매개변수**: `ctrl` 출력(NULL 불가), `config` 읽기 전용(NULL이면 기본 초기 출력 RELEASE)
 - **반환값**: `STATUS_OK`, `STATUS_ERR_PARAM`(ctrl이 NULL, config의 초기 출력이 열거 범위 밖), 또는 하위 `input_guard_init`의 오류
-- **알고리즘**: 초기 출력 결정(config 있으면 그 값, 없으면 RELEASE) → FN-028로 검사 → `input_guard_init(&ctrl->guard)` → `ctrl->outputs` = 초기 출력, `has_evaluated=false`, `last_now_ms=0` → `make_initial_result`(FN-026)
+- **알고리즘**: 초기 출력 결정(config 있으면 그 값, 없으면 RELEASE) → FN-028로 검사 → `input_guard_init(&ctrl->guard)` → `decision_log_init(&ctrl->log)` → `ctrl->outputs` = 초기 출력, `has_evaluated=false`, `last_now_ms=0` → `make_initial_result`(FN-026)
 - **오류 처리**: 어떤 검사도 실패하면 `*ctrl`을 바꾸지 않는다. 단, 하위 `input_guard_init`이 실패한 경우 `ctrl->guard`는 정의되지 않은 채로 둔다(방어 경로, 호출자는 반환값을 확인해야 한다).
 
 | 규칙 | C1 ctrl != NULL | C2 config가 NULL이 아님 | C3 초기 출력 유효 (FN-028) | C4 input_guard_init 성공 | 결과 |
@@ -378,7 +488,7 @@
 | R3 | T | F | false |
 
 ### FN-024 `run_evaluation`
-- **알고리즘**: ① `input_guard_update(&guard, now_ms, snapshot, &normalized)`. ② 성공이고 command가 있으면 `input_guard_check_command`로 검사한 명령 `checked`(없으면 상태 COMMAND_NONE). ③ 성공이면 `arbiter_input_t`(normalized, 직전 확정 출력, checked, now_ms, 현재 접근위험 기록)로 `arbiter_decide`를 호출해 `decision`을 얻는다. ④ 성공이면 `build_result`(FN-025)로 결과를 만든다. ⑤ 성공이면 `ctrl->outputs = decision.outputs`, `ctrl->approach = decision.approach`, `ctrl->last_now_ms = now_ms`, `ctrl->has_evaluated = true`, `ctrl->result = built`, `*result = built`로 갱신한다. 중간에 오류가 나면 이후 단계를 건너뛰고 직전 확정 출력, 접근위험 기록, 직전 now_ms, 결과를 갱신하지 않는다(입력 가드의 저장 상태는 ①에서 이미 바뀌었을 수 있다. 하위 호출이 호출자가 보장한 non-NULL 인자로 불리므로 실제로는 도달하지 않는 방어 경로이며 단위 테스트는 스텁으로 도달한다).
+- **알고리즘**: ① `input_guard_update(&guard, now_ms, snapshot, &normalized)`. ② 성공이고 command가 있으면 `input_guard_check_command`로 검사한 명령 `checked`(없으면 상태 COMMAND_NONE). ③ 성공이면 `arbiter_input_t`(normalized, 직전 확정 출력, checked, now_ms, 현재 접근위험 기록)로 `arbiter_decide`를 호출해 `decision`을 얻는다. ④ 성공이면 `build_result`(FN-025)로 결과를 만든다. ⑤ 성공이면 `record_decision`(FN-049)으로 이력에 추가한다(직전 결과와 비교). ⑥ 성공이면 `ctrl->outputs = decision.outputs`, `ctrl->approach = decision.approach`, `ctrl->last_now_ms = now_ms`, `ctrl->has_evaluated = true`, `ctrl->result = built`, `*result = built`로 갱신한다. 중간에 오류가 나면 이후 단계를 건너뛰고 직전 확정 출력, 접근위험 기록, 직전 now_ms, 결과를 갱신하지 않는다(입력 가드의 저장 상태는 ①에서 이미 바뀌었을 수 있다. 하위 호출이 호출자가 보장한 non-NULL 인자로 불리므로 실제로는 도달하지 않는 방어 경로이며 단위 테스트는 스텁으로 도달한다).
 - 오류 처리 단계는 `status`를 단계마다 확인하는 `if`로 구성하며 조기 `return`을 쓰지 않는다.
 
 | 규칙 | C1 update 성공 | C2 command != NULL | C3 check_command 성공 | C4 decide 성공 | C5 build_result 성공 | 결과 |
@@ -388,7 +498,8 @@
 | R3 | T | F | - | F | - | 하위 오류 반환 |
 | R4 | T | T | T | F | - | 하위 오류 반환 |
 | R5 | T | F 또는 T | T | T | F | 하위 오류 반환 |
-| R6 | T | F 또는 T | T | T | T | 상태 갱신, STATUS_OK |
+| R6 | T | F 또는 T | T | T | T (build_result 성공) 이후 record_decision 실패 | 하위 오류 반환(상태 갱신 안 함) |
+| R7 | T | F 또는 T | T | T | T (이후 record_decision 성공) | 상태 갱신, STATUS_OK |
 
 ### FN-025 `build_result`
 - `result->outputs = decision->outputs`, `state`, `reason`, `priority_reason = reason`, `warning`, `command_status = command`, `input_validity[i] = inputs->validity[i]`, `override_active[좌/우] = decision->approach.door[좌/우].override_active`. 반환 `STATUS_OK`.
@@ -488,3 +599,4 @@ flowchart LR
 | 0.2 | 2026-11-27 | FN-004, FN-005, FN-006, FN-007, FN-008, FN-009, FN-010, FN-014, FN-018, FN-020, FN-021, FN-024, FN-027, FN-028 | 구현 전 테스트 가능성 점검: MC/DC로 독립 효과를 보일 수 없는 중복 조건(범위, NaN) 제거, 항상 성공하는 상태 반환 체인과 도달 불가 default 제거, 매개변수 검사 분리(FN-027, 028) | 없음 |
 | 0.3 | 2026-11-27 | FN-003, FN-014, FN-017, FN-018, FN-019, FN-024, FN-025, FN-026, FN-029, FN-030, FN-031, FN-032, FN-033, FN-034, FN-035, FN-036 | 이터레이션 2: 전역 해제 규칙, 문 단위 규칙, 접근위험 억제·override 기록, 검사한 명령 구조체. 단계 리뷰는 사용자 지시로 생략 | 아키텍처 설계서 |
 | 0.4 | 2026-11-27 | FN-014, FN-017, FN-018, FN-030, FN-031, FN-034 | 이터레이션 2 구현 전 테스트 가능성 점검: 독립 효과를 보일 수 없는 중복 조건(접근위험 해제 판정, 차속 입력 상태) 제거, 전역 규칙 없음을 RULE_NONE으로 통일 | 없음 |
+| 0.5 | 2026-11-27 | MOD-005, MOD-006, MIF-005, MIF-006, FN-020, FN-024, FN-037, FN-038, FN-039, FN-040, FN-041, FN-042, FN-043, FN-044, FN-045, FN-046, FN-047, FN-048, FN-049 | 이터레이션 3: 상태 직렬화 모듈, 제어 결정 이력 모듈, lock_ctrl의 이력 기록과 조회. 단계 리뷰는 사용자 지시로 생략 | 아키텍처 설계서 |

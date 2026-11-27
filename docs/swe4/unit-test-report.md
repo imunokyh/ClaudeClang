@@ -1,6 +1,6 @@
 # SW 단위 테스트 결과서
 
-- 대상 SW: 전자식 차일드락 제어 SW   버전: 0.2 (이터레이션 1~2)   일자: 2026-11-27
+- 대상 SW: 전자식 차일드락 제어 SW   버전: 0.3 (이터레이션 1~3)   일자: 2026-11-27
 - 명세: [unit-test-spec.md](unit-test-spec.md)
 - 실행 환경: Docker 이미지 `claudeclangbuild`(Clang 23.1.6, llvm-cov 23.1.6), `docker run ... tools/run.sh unit`
 - 면책: 교육용 가상 OEM 입력에 대한 시험이며 준수·인증·ASIL 달성을 주장하지 않는다.
@@ -9,11 +9,11 @@
 
 | 항목 | 기준 | 결과 | 판정 |
 |---|---|---|---|
-| 테스트 성공률 | 100% | 57건 중 57건 통과 (0건 실패) | 통과 |
-| MC/DC 커버리지 | 100% | 60/60 = 100.00% (파일 3개) | 통과 |
-| 변이 확인 | 모든 변이를 잡음 | 18개 중 18개 잡힘 (`tools/mutation_check.sh`) | 통과 |
+| 테스트 성공률 | 100% | 72건 중 72건 통과 (0건 실패) | 통과 |
+| MC/DC 커버리지 | 100% | 76/76 = 100.00% (파일 6개) | 통과 |
+| 변이 확인 | 모든 변이를 잡음 | 22개 중 22개 잡힘 (`tools/mutation_check.sh`) | 통과 |
 
-`tools/run.sh unit` 판정 줄: `MC/DC 커버리지: 60/60 = 100.00% (파일 3개, 기준 100%)` / `판정: 통과`
+`tools/run.sh unit` 판정 줄: `MC/DC 커버리지: 76/76 = 100.00% (파일 6개, 기준 100%)` / `판정: 통과`
 
 ## 2. 실행 파일별 결과
 
@@ -21,7 +21,9 @@
 |---|---|---|
 | `ut_input_guard` | 14 | 0 |
 | `ut_arbiter` | 26 | 0 |
-| `ut_lock_ctrl` | 17 | 0 |
+| `ut_lock_ctrl` | 22 | 0 |
+| `ut_decision_log` | 5 | 0 |
+| `ut_status_view` | 5 | 0 |
 
 ## 3. 파일별 커버리지 (llvm-cov, 계측: `-fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc`)
 
@@ -29,14 +31,16 @@
 |---|---|---|---|---|
 | `src/input_guard/input_guard.c` | 24/24 | 13/13 | 149/149 | 91/92 |
 | `src/arbiter/arbiter.c` | 21/21 | 15/15 | 222/222 | 113/114 |
-| `src/lock_ctrl/lock_ctrl.c` | 15/15 | 8/8 | 117/117 | 46/46 |
+| `src/lock_ctrl/lock_ctrl.c` | 19/19 | 12/12 | 156/156 | 64/64 |
+| `src/decision_log/decision_log.c` | 7/7 | 4/4 | 53/53 | 20/20 |
+| `src/status_view/status_view.c` | 5/5 | 5/5 | 81/81 | 24/24 |
 
 - 분기 커버리지는 기준이 아니다. 100%가 아닌 두 파일의 미충족 1건씩은 열거형 `switch`에서 모든 값을 처리한 뒤의 도달할 수 없는 fall-through 경로다(설계 3.1: `default`를 두지 않음).
 - HTML 보고서: `build/reports/unit/html/index.html`, MC/DC 상세: `build/reports/unit/mcdc.txt` (CI 아티팩트로도 보존).
 
 ## 4. 변이 확인
 
-`tools/mutation_check.sh`가 제품 코드의 조건 18곳을 하나씩 바꾸고 단위 테스트가 실패하는지 확인했다.
+`tools/mutation_check.sh`가 제품 코드의 조건 22곳을 하나씩 바꾸고 단위 테스트가 실패하는지 확인했다.
 
 | 변이 | 결과 |
 |---|---|
@@ -45,6 +49,7 @@
 | 규칙 2의 입력 항목, 입력 상태 VALID 조건, state 결정(FAULT 조건 단독) | 잡힘 |
 | 평가 시각 역행 경계, 명령 검사 호출 조건, 직전 확정 출력 갱신 생략 | 잡힘 |
 | override 창 경계(10,000 ms), 자동 잠금 경계(3.0 km/h), 명령 side all, override 성립 문의 접근위험 규칙, override 이유, ignition off 규칙 | 잡힘 |
+| 이력 보존 상한(100건), 이력 조회 index 경계, 직렬화 버퍼 경계, 결정 변화 판정(state) | 잡힘 |
 
 ## 5. 결함과 미검증 범위
 
@@ -57,3 +62,4 @@
 |---|---|---|---|---|
 | 0.1 | 2026-11-27 | UT-001, UT-002, UT-003, UT-004, UT-005, UT-006, UT-007, UT-008, UT-009, UT-010, UT-011, UT-012, UT-013, UT-014 | 이터레이션 1 최초 작성 | 없음 |
 | 0.2 | 2026-11-27 | UT-060, UT-061, UT-062, UT-063, UT-064, UT-065, UT-066, UT-067, UT-068, UT-069, UT-070, UT-071, UT-072, UT-073, UT-074, UT-080, UT-081, UT-082 | 이터레이션 2 결과 추가(57건, MC/DC 60/60, 변이 18/18) | 없음 |
+| 0.3 | 2026-11-27 | UT-090, UT-091, UT-092, UT-093, UT-094, UT-100, UT-101, UT-102, UT-103, UT-104, UT-110, UT-111, UT-112, UT-113, UT-114 | 이터레이션 3 결과 추가 | 없음 |
