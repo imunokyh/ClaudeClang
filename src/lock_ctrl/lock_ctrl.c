@@ -133,7 +133,9 @@ static status_t build_result(const decision_t *decision, const normalized_inputs
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool is_decision_change(const lock_ctrl_result_t *previous, const lock_ctrl_result_t *next)
 {
@@ -154,7 +156,9 @@ static bool is_decision_change(const lock_ctrl_result_t *previous, const lock_ct
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t record_decision(lock_ctrl_t *ctrl, const lock_ctrl_result_t *built, uint32_t now_ms)
 {
@@ -184,7 +188,9 @@ static status_t record_decision(lock_ctrl_t *ctrl, const lock_ctrl_result_t *bui
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t run_evaluation(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input,
                                lock_ctrl_result_t *result)
@@ -241,7 +247,9 @@ static status_t run_evaluation(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config)
 {
@@ -348,7 +356,9 @@ status_t lock_ctrl_get_result(const lock_ctrl_t *ctrl, lock_ctrl_result_t *resul
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t lock_ctrl_get_log_count(const lock_ctrl_t *ctrl, uint32_t *count)
 {
@@ -374,7 +384,9 @@ status_t lock_ctrl_get_log_count(const lock_ctrl_t *ctrl, uint32_t *count)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t lock_ctrl_get_log_entry(const lock_ctrl_t *ctrl, uint32_t index, decision_entry_t *entry)
 {

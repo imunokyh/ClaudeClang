@@ -28,7 +28,9 @@ extern "C"
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 NODISCARD status_t status_view_format(const lock_ctrl_result_t *result, char *buffer, size_t size);
 

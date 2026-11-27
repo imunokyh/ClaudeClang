@@ -17,7 +17,9 @@
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t decision_log_init(decision_log_t *log)
 {
@@ -51,7 +53,9 @@ status_t decision_log_init(decision_log_t *log)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t decision_log_append(decision_log_t *log, const decision_entry_t *entry)
 {
@@ -84,7 +88,9 @@ status_t decision_log_append(decision_log_t *log, const decision_entry_t *entry)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t decision_log_count(const decision_log_t *log, uint32_t *count)
 {
@@ -111,7 +117,9 @@ status_t decision_log_count(const decision_log_t *log, uint32_t *count)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t decision_log_get(const decision_log_t *log, uint32_t index, decision_entry_t *out)
 {

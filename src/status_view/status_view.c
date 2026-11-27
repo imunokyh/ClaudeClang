@@ -55,7 +55,9 @@ static const char *const ITEM_NAMES[ITEM_COUNT] = {"vehicle_speed",
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static const char *name_of(const char *const *names, int count, int value)
 {
@@ -80,7 +82,9 @@ static const char *name_of(const char *const *names, int count, int value)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static int fill_scalar_pieces(const lock_ctrl_result_t *result, const char **pieces)
 {
@@ -120,7 +124,9 @@ static int fill_scalar_pieces(const lock_ctrl_result_t *result, const char **pie
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static int fill_validity_pieces(const lock_ctrl_result_t *result, const char **pieces)
 {
@@ -153,7 +159,9 @@ static int fill_validity_pieces(const lock_ctrl_result_t *result, const char **p
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t join_pieces(const char *const *pieces, int count, char *buffer, size_t size)
 {
@@ -199,7 +207,9 @@ static status_t join_pieces(const char *const *pieces, int count, char *buffer, 
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t status_view_format(const lock_ctrl_result_t *result, char *buffer, size_t size)
 {

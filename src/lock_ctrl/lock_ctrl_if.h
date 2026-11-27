@@ -43,7 +43,9 @@ typedef struct
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 NODISCARD status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config);
 
@@ -95,7 +97,9 @@ NODISCARD status_t lock_ctrl_get_result(const lock_ctrl_t *ctrl, lock_ctrl_resul
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 NODISCARD status_t lock_ctrl_get_log_count(const lock_ctrl_t *ctrl, uint32_t *count);
 
@@ -111,7 +115,9 @@ NODISCARD status_t lock_ctrl_get_log_count(const lock_ctrl_t *ctrl, uint32_t *co
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 NODISCARD status_t lock_ctrl_get_log_entry(const lock_ctrl_t *ctrl, uint32_t index,
                                            decision_entry_t *entry);
