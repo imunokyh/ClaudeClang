@@ -75,7 +75,9 @@ static const item_spec_t ITEM_SPECS[ITEM_COUNT] = {
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool validate_boolean(const raw_value_t *raw, int64_t *value)
 {
@@ -104,7 +106,9 @@ static bool validate_boolean(const raw_value_t *raw, int64_t *value)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool validate_integer_range(const raw_value_t *raw, double lower, double upper,
                                    int64_t *value)
@@ -131,7 +135,9 @@ static bool validate_integer_range(const raw_value_t *raw, double lower, double 
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool validate_speed(const raw_value_t *raw, int64_t *value)
 {
@@ -158,7 +164,9 @@ static bool validate_speed(const raw_value_t *raw, int64_t *value)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool validate_item(const item_spec_t *spec, const raw_value_t *raw, double upper_bound,
                           int64_t *value)
@@ -198,7 +206,9 @@ static bool validate_item(const item_spec_t *spec, const raw_value_t *raw, doubl
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool is_item_acceptable(const item_spec_t *spec, const raw_value_t *raw,
                                bool snapshot_accepted, double upper_bound, int64_t *value)
@@ -217,7 +227,9 @@ static bool is_item_acceptable(const item_spec_t *spec, const raw_value_t *raw,
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static double item_upper_bound(const item_spec_t *spec, const raw_snapshot_t *snapshot)
 {
@@ -243,7 +255,9 @@ static double item_upper_bound(const item_spec_t *spec, const raw_snapshot_t *sn
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool is_snapshot_time_acceptable(const input_guard_t *guard, uint32_t now_ms,
                                         const raw_snapshot_t *snapshot)
@@ -265,7 +279,9 @@ static bool is_snapshot_time_acceptable(const input_guard_t *guard, uint32_t now
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool is_snapshot_stale(const input_guard_t *guard, uint32_t now_ms)
 {
@@ -284,7 +300,9 @@ static bool is_snapshot_stale(const input_guard_t *guard, uint32_t now_ms)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static validity_t compute_validity(const input_guard_t *guard, input_item_t item, uint32_t now_ms)
 {
@@ -314,7 +332,9 @@ static validity_t compute_validity(const input_guard_t *guard, input_item_t item
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t fill_normalized_inputs(const input_guard_t *guard, uint32_t now_ms,
                                        normalized_inputs_t *out)
@@ -338,7 +358,9 @@ static status_t fill_normalized_inputs(const input_guard_t *guard, uint32_t now_
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t input_guard_init(input_guard_t *guard)
 {
@@ -373,7 +395,9 @@ status_t input_guard_init(input_guard_t *guard)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t input_guard_update(input_guard_t *guard, uint32_t now_ms, const raw_snapshot_t *snapshot,
                             normalized_inputs_t *out)
@@ -421,7 +445,9 @@ status_t input_guard_update(input_guard_t *guard, uint32_t now_ms, const raw_sna
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t input_guard_check_command(const raw_command_t *command, command_status_t *out)
 {

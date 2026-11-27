@@ -31,7 +31,9 @@ typedef enum
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool is_valid_lock_outputs(const lock_outputs_t *outputs)
 {
@@ -51,7 +53,9 @@ static bool is_valid_lock_outputs(const lock_outputs_t *outputs)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool has_item_value(const normalized_inputs_t *inputs, input_item_t item, int64_t expected)
 {
@@ -69,7 +73,9 @@ static bool has_item_value(const normalized_inputs_t *inputs, input_item_t item,
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool has_any_validity(const normalized_inputs_t *inputs, validity_t validity)
 {
@@ -96,7 +102,9 @@ static bool has_any_validity(const normalized_inputs_t *inputs, validity_t valid
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static arbiter_rule_t select_rule(const normalized_inputs_t *inputs)
 {
@@ -142,7 +150,9 @@ static arbiter_rule_t select_rule(const normalized_inputs_t *inputs)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t apply_rule(arbiter_rule_t rule, const lock_outputs_t *previous, decision_t *out)
 {
@@ -185,7 +195,9 @@ static status_t apply_rule(arbiter_rule_t rule, const lock_outputs_t *previous, 
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static ctrl_state_t decide_state(bool fault_condition, bool degraded_condition)
 {
@@ -219,7 +231,9 @@ static ctrl_state_t decide_state(bool fault_condition, bool degraded_condition)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t arbiter_decide(const normalized_inputs_t *inputs, const lock_outputs_t *previous,
                         decision_t *out)

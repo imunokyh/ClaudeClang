@@ -20,7 +20,9 @@
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool is_valid_initial_outputs(const lock_outputs_t *outputs)
 {
@@ -39,7 +41,9 @@ static bool is_valid_initial_outputs(const lock_outputs_t *outputs)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t make_initial_result(const lock_outputs_t *initial, lock_ctrl_result_t *result)
 {
@@ -69,7 +73,9 @@ static status_t make_initial_result(const lock_outputs_t *initial, lock_ctrl_res
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static bool is_time_regressed(const lock_ctrl_t *ctrl, uint32_t now_ms)
 {
@@ -89,7 +95,9 @@ static bool is_time_regressed(const lock_ctrl_t *ctrl, uint32_t now_ms)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t build_result(const decision_t *decision, const normalized_inputs_t *inputs,
                              command_status_t command, lock_ctrl_result_t *result)
@@ -122,7 +130,9 @@ static status_t build_result(const decision_t *decision, const normalized_inputs
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 static status_t run_evaluation(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input,
                                lock_ctrl_result_t *result)
@@ -168,7 +178,9 @@ static status_t run_evaluation(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config)
 {
@@ -207,7 +219,9 @@ status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config)
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t lock_ctrl_evaluate(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input,
                             lock_ctrl_result_t *result)
@@ -240,7 +254,9 @@ status_t lock_ctrl_evaluate(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input,
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 status_t lock_ctrl_get_result(const lock_ctrl_t *ctrl, lock_ctrl_result_t *result)
 {

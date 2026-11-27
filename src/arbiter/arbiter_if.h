@@ -25,7 +25,9 @@ extern "C"
  * - 일시: 2026-11-27
  * - 요청자: imunokyh
  * @par 사용자 리뷰
- * - 상태: 미완료
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
  */
 NODISCARD status_t arbiter_decide(const normalized_inputs_t *inputs, const lock_outputs_t *previous,
                                   decision_t *out);
