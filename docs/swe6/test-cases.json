@@ -1,0 +1,1075 @@
+{
+  "project": "전자식 차일드락 제어 SW (이터레이션 1)",
+  "test_level": "SWE.6",
+  "test_basis_source": "docs/swe1/software-requirements.md v0.5, docs/swe1/safety-requirements.md v0.5",
+  "test_basis": [
+    {
+      "id": "SWR-007",
+      "title": "충돌 CONFIRMED 해제",
+      "type": "기능",
+      "text": "crash_status 입력 상태가 VALID이고 CONFIRMED이면 두 출력을 RELEASE로 확정하고 결정 이유를 CRASH_CONFIRMED로 한다.",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: 충돌은 순서 없는 열거라 경계가 없고 동치 클래스(NONE, PENDING, CONFIRMED)로 덮는다."
+    },
+    {
+      "id": "SWR-008",
+      "title": "충돌 CONFIRMED 유지",
+      "type": "기능",
+      "text": "CONFIRMED가 VALID로 유지되는 동안 매 평가마다 두 출력을 RELEASE로 확정한다.",
+      "asil": "ASIL B",
+      "technique_notes": "동치 클래스: 입력값이 하나뿐(CONFIRMED 유지)이라 클래스 분할이 없고 지속 시간(100주기)을 경계로 본다."
+    },
+    {
+      "id": "SWR-036",
+      "title": "충돌 PENDING 처리",
+      "type": "기능",
+      "text": "PENDING이면 출력을 바꾸지 않고 CRASH_PENDING을 기록한다.",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: 순서 없는 열거라 경계가 없다."
+    },
+    {
+      "id": "SWR-013",
+      "title": "STALE 판정",
+      "type": "기능",
+      "text": "받아들인 스냅샷이 없거나 마지막 수신 후 200 ms를 초과하면 INVALID가 아닌 모든 입력을 STALE로 표시한다.",
+      "asil": "ASIL B",
+      "technique_notes": ""
+    },
+    {
+      "id": "SWR-021",
+      "title": "sensor_fault 유지",
+      "type": "기능",
+      "text": "sensor_fault가 VALID이고 TRUE이면 경고 SENSOR_FAULT, 이유 SENSOR_FAULT, 직전 출력 유지(충돌 해제 예외).",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: boolean 입력이라 경계가 없고 동치 클래스(TRUE, FALSE)로 덮는다."
+    },
+    {
+      "id": "SWR-022",
+      "title": "입력 검사",
+      "type": "기능",
+      "text": "차량 입력의 누락, 형식, 범위, 미정 enum을 INVALID로 정하고 판정에 쓰지 않으며 갱신으로 치지 않는다.",
+      "asil": "ASIL B",
+      "technique_notes": ""
+    },
+    {
+      "id": "SWR-034",
+      "title": "INVALID 처리",
+      "type": "기능",
+      "text": "INVALID 입력이 있고 규칙 1, 2가 성립하지 않으면 직전 출력을 유지하고 INPUT_INVALID를 기록한다.",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: 상태 기반 동작이라 경계 값이 없고 상태 전이(무효→유지→복귀)로 덮는다."
+    },
+    {
+      "id": "SWR-024",
+      "title": "STALE 처리",
+      "type": "기능",
+      "text": "STALE 입력이 있고 규칙 1~3이 성립하지 않으면 직전 출력을 유지하고 INPUT_STALE을 기록한다.",
+      "asil": "ASIL B",
+      "technique_notes": "동치 클래스, 경계값 분석: STALE 판정의 경계(200 ms)와 클래스는 SWR-013(FTC-006)이 검증하고, 이 항목은 STALE 이후의 출력 동작이라 요구사항 기반으로 검증한다."
+    },
+    {
+      "id": "SWR-035",
+      "title": "state 결정",
+      "type": "기능",
+      "text": "FAULT 조건이면 FAULT, 아니면 DEGRADED 조건이면 DEGRADED, 아니면 NORMAL. 원인이 사라진 평가에서 NORMAL.",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: 조건 조합 표(결정 테이블)로 덮고 수치 경계는 없다."
+    },
+    {
+      "id": "SWR-023",
+      "title": "결정 규칙 우선순위",
+      "type": "기능",
+      "text": "결정 규칙표의 규칙 중 처음 성립한 것으로 출력과 이유를 정한다.",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: 규칙 조합 표(결정 테이블)로 덮고 수치 경계는 없다."
+    },
+    {
+      "id": "SWR-044",
+      "title": "평가 순서",
+      "type": "기능",
+      "text": "now_ms 검사 → 입력 검사 → state 결정 → 출력 결정 순서로 수행하고 입력 검사 결과를 같은 평가에 쓴다.",
+      "asil": "ASIL B",
+      "technique_notes": "동치 클래스, 경계값 분석: 처리 순서 요구라 입력 분할·경계가 없다. 무효 입력 주입 평가에서 같은 평가의 반영으로 검증한다."
+    },
+    {
+      "id": "SWR-025",
+      "title": "초기값",
+      "type": "기능",
+      "text": "초기화 직후 출력, state, 입력 상태, 이유, 경고, 명령 상태를 정해진 초기값으로 둔다.",
+      "asil": "ASIL B",
+      "technique_notes": "동치 클래스, 경계값 분석: 입력이 없는 초기값 요구라 입력 분할·경계가 없다."
+    },
+    {
+      "id": "SWR-039",
+      "title": "초기 출력 지정",
+      "type": "기능",
+      "text": "초기화 때 초기 출력을 지정할 수 있다(시험 지원).",
+      "asil": "QM",
+      "technique_notes": "경계값 분석: 입력이 순서 없는 두 값(LOCK, RELEASE)이라 경계가 없다."
+    },
+    {
+      "id": "SWR-040",
+      "title": "평가 시각 검사",
+      "type": "기능",
+      "text": "now_ms가 직전에 받아들여진 평가보다 작으면 거절하고 STATUS_ERR_TIME을 반환하며 상태를 바꾸지 않는다.",
+      "asil": "ASIL B",
+      "technique_notes": ""
+    },
+    {
+      "id": "SWR-046",
+      "title": "스냅샷 시각 거절",
+      "type": "기능",
+      "text": "스냅샷 시각이 누락, 범위 오류, 역행, 미래이면 스냅샷을 거절하고 모든 입력을 INVALID로 한다.",
+      "asil": "ASIL B",
+      "technique_notes": ""
+    },
+    {
+      "id": "SWR-033",
+      "title": "운전자 명령 검사",
+      "type": "기능",
+      "text": "명령 필드가 누락이거나 값 집합 밖이면 REJECTED, 유효하면 ACCEPTED, 없으면 NONE. 출력과 state를 바꾸지 않는다.",
+      "asil": "QM",
+      "technique_notes": ""
+    },
+    {
+      "id": "SWR-026",
+      "title": "충돌 해제 응답 시간",
+      "type": "비기능",
+      "text": "충돌 CONFIRMED 스냅샷 시각 T부터 출력 확정까지 300 ms 이내.",
+      "asil": "ASIL B",
+      "technique_notes": "동치 클래스: 시간 요구라 입력 분할이 없고 경계값(300 ms)으로 덮는다."
+    },
+    {
+      "id": "SWR-027",
+      "title": "STALE 검출 시간",
+      "type": "비기능",
+      "text": "마지막 수신 후 200 ms를 초과한 시점부터 100 ms 이내에 STALE(DEGRADED).",
+      "asil": "ASIL B",
+      "technique_notes": "동치 클래스: 시간 요구라 입력 분할이 없고 경계값(200/300 ms)으로 덮는다."
+    },
+    {
+      "id": "SWR-031",
+      "title": "평가 실행 시간",
+      "type": "비기능",
+      "text": "평가 한 번의 실행 시간은 10 ms 이하.",
+      "asil": "QM",
+      "technique_notes": "동치 클래스, 경계값 분석: 입력 분할이 없는 자원 제한이며 1,000회 반복 측정의 최댓값으로 검증한다."
+    },
+    {
+      "id": "SWR-028",
+      "title": "C11",
+      "type": "비기능",
+      "text": "제품 코드는 C11로 작성한다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SWR-041",
+      "title": "Clang 빌드",
+      "type": "비기능",
+      "text": "제품 코드는 Clang으로 빌드한다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SWR-037",
+      "title": "경고 없는 빌드",
+      "type": "비기능",
+      "text": "컴파일러 경고 없이 빌드된다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SWR-029",
+      "title": "동적 메모리 금지",
+      "type": "비기능",
+      "text": "동적 메모리 할당 함수를 호출하지 않는다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SWR-042",
+      "title": "재귀 금지",
+      "type": "비기능",
+      "text": "재귀 호출을 하지 않는다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SWR-038",
+      "title": "void 금지",
+      "type": "비기능",
+      "text": "모든 함수는 void 대신 상태 값을 반환한다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SWR-043",
+      "title": "단일 return",
+      "type": "비기능",
+      "text": "모든 함수는 return을 끝에 한 번만 둔다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SWR-032",
+      "title": "시계 호출 금지",
+      "type": "비기능",
+      "text": "시스템 시계 함수를 호출하지 않는다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SWR-047",
+      "title": "난수 호출 금지",
+      "type": "비기능",
+      "text": "난수 함수를 호출하지 않는다.",
+      "asil": "QM",
+      "technique_notes": "해당 없음: 입력 파라미터와 순서 있는 범위가 없는 개발 제약(정적 검사로 검증)"
+    },
+    {
+      "id": "SAF-001",
+      "title": "충돌 해제(안전)",
+      "type": "기능",
+      "text": "유효한 충돌 CONFIRMED이면 다른 모든 명령보다 우선하여 RELEASE, 300 ms 이내, 유지.",
+      "asil": "ASIL B",
+      "technique_notes": ""
+    },
+    {
+      "id": "SAF-003",
+      "title": "STALE 안전 반응",
+      "type": "기능",
+      "text": "200 ms 초과 미갱신 시 100 ms 이내 DEGRADED, 직전 출력 유지.",
+      "asil": "ASIL B",
+      "technique_notes": ""
+    },
+    {
+      "id": "SAF-004",
+      "title": "sensor_fault 안전 반응",
+      "type": "기능",
+      "text": "sensor_fault TRUE이면 직전 출력 유지, FAULT와 경고.",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: boolean 입력이라 경계가 없다."
+    },
+    {
+      "id": "SAF-005",
+      "title": "무효 입력 안전 반응",
+      "type": "기능",
+      "text": "무효 입력은 판정에 쓰지 않고 DEGRADED, 직전 출력 유지.",
+      "asil": "ASIL B",
+      "technique_notes": ""
+    }
+  ],
+  "test_cases": [
+    {
+      "tc_id": "FTC-001",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-007",
+        "SAF-001"
+      ],
+      "objective": "충돌 CONFIRMED가 들어온 평가에서 두 출력이 RELEASE가 됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "crash_status = CONFIRMED(2), 스냅샷 시각 = now_ms = 10 ms",
+      "procedure": [
+        "충돌 NONE 스냅샷으로 평가 시각 0 ms에 평가해 출력이 LOCK 유지임을 확인",
+        "crash_status를 CONFIRMED로 바꿔 10 ms에 평가",
+        "결과를 조회"
+      ],
+      "expected": "lock_left = RELEASE, lock_right = RELEASE, reason = CRASH_CONFIRMED, 반환 STATUS_OK (같은 평가에서)",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-002",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-008",
+        "SAF-001"
+      ],
+      "objective": "충돌 CONFIRMED를 100주기 유지하는 동안 매번 RELEASE임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "crash_status = CONFIRMED를 담은 스냅샷을 10 ms 간격으로 100번",
+      "procedure": [
+        "10 ms에 CONFIRMED로 첫 평가",
+        "20 ms부터 1010 ms까지 10 ms 간격으로 평가(총 100번)",
+        "매 평가 결과를 확인"
+      ],
+      "expected": "100번 모두 lock_left = RELEASE, lock_right = RELEASE, reason = CRASH_CONFIRMED",
+      "techniques": [
+        "경계값 분석",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-003",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-036"
+      ],
+      "objective": "충돌 PENDING은 출력을 바꾸지 않고 이유만 남김을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "crash_status = PENDING(1)",
+      "procedure": [
+        "PENDING 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "lock_left = LOCK, lock_right = LOCK 유지, reason = CRASH_PENDING, state = NORMAL",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-004",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-021",
+        "SAF-004"
+      ],
+      "objective": "sensor_fault TRUE에서 직전 출력을 유지하고 FAULT와 경고를 내는지 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "sensor_fault = 1",
+      "procedure": [
+        "sensor_fault = 1 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "lock_left = LOCK, lock_right = LOCK 유지, state = FAULT, warning = SENSOR_FAULT, reason = SENSOR_FAULT",
+      "techniques": [
+        "동치 클래스",
+        "결함 주입"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-005",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-021",
+        "SWR-007",
+        "SWR-023",
+        "SAF-004",
+        "SAF-001"
+      ],
+      "objective": "충돌 CONFIRMED와 sensor_fault가 동시에 들어오면 충돌 해제가 우선하고 FAULT는 유지됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "crash_status = CONFIRMED, sensor_fault = 1 (같은 스냅샷)",
+      "procedure": [
+        "두 값을 함께 담은 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "lock_left = RELEASE, lock_right = RELEASE, reason = CRASH_CONFIRMED, state = FAULT, warning = SENSOR_FAULT",
+      "techniques": [
+        "WoW 검증",
+        "결정 테이블"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-006",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-013",
+        "SAF-003"
+      ],
+      "objective": "마지막 수신 후 200 ms까지는 VALID, 201 ms부터 STALE임을 경계값으로 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "스냅샷은 100 ms에 한 번만 송신, 이후 스냅샷 없음. 평가 시각 300, 301 ms",
+      "procedure": [
+        "100 ms에 유효 스냅샷으로 평가",
+        "스냅샷 없이 300 ms에 평가해 입력 상태 확인",
+        "스냅샷 없이 301 ms에 평가해 입력 상태 확인"
+      ],
+      "expected": "300 ms: 모든 input_validity = VALID, state = NORMAL. 301 ms: 모든 input_validity = STALE, state = DEGRADED",
+      "techniques": [
+        "경계값 분석",
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-007",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-024",
+        "SAF-003"
+      ],
+      "objective": "STALE에서 직전 출력을 유지하고 INPUT_STALE을 기록하는지 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "100 ms에 스냅샷 후 중단, 310 ms 평가",
+      "procedure": [
+        "100 ms에 평가",
+        "스냅샷 없이 310 ms에 평가"
+      ],
+      "expected": "lock_left = LOCK, lock_right = LOCK 유지, reason = INPUT_STALE, state = DEGRADED",
+      "techniques": [
+        "요구사항 기반 테스트",
+        "결함 주입"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-008",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-024",
+        "SWR-007"
+      ],
+      "objective": "충돌 입력이 STALE이면 마지막 CONFIRMED로 해제를 새로 적용하지 않음을 확인(가정 A-04)",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "CONFIRMED 스냅샷 1회(10 ms) 후 중단, 211 ms 평가. 초기 출력은 LOCK",
+      "procedure": [
+        "10 ms에 CONFIRMED로 평가해 RELEASE 확인",
+        "스냅샷 없이 200 ms에 평가",
+        "스냅샷 없이 211 ms에 평가"
+      ],
+      "expected": "200 ms: reason = CRASH_CONFIRMED. 211 ms: reason = INPUT_STALE이고 출력은 직전 확정 출력(RELEASE) 그대로(새로 해제하는 것이 아니라 직전 출력 유지)",
+      "techniques": [
+        "WoW 검증",
+        "오류 추측"
+      ],
+      "origin": "제안",
+      "pict_ref": "",
+      "remarks": "OEM 질의 Q-17(가정 A-04)의 해석을 확인하는 케이스"
+    },
+    {
+      "tc_id": "FTC-009",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-022",
+        "SAF-005"
+      ],
+      "objective": "차속 경계값: 0.0과 300.0은 VALID, 300.1은 INVALID",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "vehicle_speed_kph = 0.0, 300.0, 300.1 (각각 별도 스냅샷)",
+      "procedure": [
+        "차속 0.0 스냅샷으로 평가해 입력 상태 확인",
+        "차속 300.0으로 평가",
+        "차속 300.1로 평가"
+      ],
+      "expected": "0.0과 300.0: input_validity[vehicle_speed] = VALID. 300.1: INVALID",
+      "techniques": [
+        "경계값 분석",
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-010",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-022",
+        "SAF-005"
+      ],
+      "objective": "기어 값이 정의되지 않은 4이면 INVALID임을 확인(무효 클래스 하나)",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "gear = 4, 나머지 유효",
+      "procedure": [
+        "gear = 4 스냅샷으로 평가"
+      ],
+      "expected": "input_validity[gear] = INVALID, 다른 항목은 VALID, reason = INPUT_INVALID, state = DEGRADED",
+      "techniques": [
+        "동치 클래스",
+        "경계값 분석"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-011",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-022",
+        "SAF-005"
+      ],
+      "objective": "boolean 항목에 2가 들어오면 INVALID임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "isofix_left = 2, 나머지 유효",
+      "procedure": [
+        "isofix_left = 2 스냅샷으로 평가"
+      ],
+      "expected": "input_validity[isofix_left] = INVALID, reason = INPUT_INVALID",
+      "techniques": [
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-012",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-022",
+        "SAF-005"
+      ],
+      "objective": "입력 항목이 누락되면(값은 0이어도) INVALID임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "crash_status 항목이 누락(present = false), 나머지 유효",
+      "procedure": [
+        "crash_status 누락 스냅샷으로 평가"
+      ],
+      "expected": "input_validity[crash_status] = INVALID, reason = INPUT_INVALID",
+      "techniques": [
+        "동치 클래스",
+        "오류 추측"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-013",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-022",
+        "SAF-005"
+      ],
+      "objective": "차속이 NaN이면 INVALID임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "vehicle_speed_kph = NaN",
+      "procedure": [
+        "NaN 차속 스냅샷으로 평가"
+      ],
+      "expected": "input_validity[vehicle_speed] = INVALID, reason = INPUT_INVALID",
+      "techniques": [
+        "동치 클래스",
+        "오류 추측"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-014",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-034",
+        "SAF-005",
+        "SWR-022"
+      ],
+      "objective": "무효 입력은 직전 출력을 유지하고, 스냅샷이 없어도 유지되며, 유효 값이 오면 풀림을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "차속 301.0 → 스냅샷 없음 → 차속 50.0",
+      "procedure": [
+        "차속 301.0 스냅샷으로 10 ms에 평가",
+        "스냅샷 없이 20 ms에 평가",
+        "차속 50.0 스냅샷으로 30 ms에 평가"
+      ],
+      "expected": "10, 20 ms: lock_left = LOCK 유지, reason = INPUT_INVALID, state = DEGRADED, 차속 INVALID. 30 ms: state = NORMAL, 차속 VALID",
+      "techniques": [
+        "상태 전이",
+        "결함 주입"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-015",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-035",
+        "SAF-003",
+        "SAF-004",
+        "SAF-005"
+      ],
+      "objective": "state 결정표: FAULT와 DEGRADED 동시, sensor_fault 입력 무효, 복귀",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "(a) sensor_fault = 1과 gear = 4 동시, (b) sensor_fault = 5 (무효), (c) 모두 정상",
+      "procedure": [
+        "(a) 스냅샷으로 10 ms에 평가",
+        "(b) 스냅샷으로 20 ms에 평가",
+        "(c) 스냅샷으로 30 ms에 평가"
+      ],
+      "expected": "(a) state = FAULT, warning = SENSOR_FAULT. (b) state = DEGRADED, warning = NONE. (c) state = NORMAL, warning = NONE",
+      "techniques": [
+        "결정 테이블",
+        "WoW 검증"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-016",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-023"
+      ],
+      "objective": "결정 규칙 우선순위: INVALID와 STALE이 동시에 있으면 INVALID가 이유가 됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "100 ms에 gear = 4(무효)를 담은 스냅샷 1회, 이후 스냅샷 없이 310 ms 평가",
+      "procedure": [
+        "100 ms에 gear = 4 스냅샷으로 평가",
+        "스냅샷 없이 310 ms에 평가"
+      ],
+      "expected": "310 ms: gear는 INVALID, 나머지 항목은 STALE, reason = INPUT_INVALID(INPUT_STALE이 아님), state = DEGRADED, 출력 LOCK 유지",
+      "techniques": [
+        "결정 테이블",
+        "WoW 검증"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-017",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-044",
+        "SAF-005"
+      ],
+      "objective": "무효 입력 주입이 같은 평가의 출력에 반영됨을 확인(다음 평가가 아님)",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "gear = 9를 담은 스냅샷 1개",
+      "procedure": [
+        "gear = 9 스냅샷으로 10 ms에 평가하고 결과를 즉시 확인"
+      ],
+      "expected": "같은 평가에서 gear = INVALID, reason = INPUT_INVALID, state = DEGRADED",
+      "techniques": [
+        "요구사항 기반 테스트",
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-018",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-025"
+      ],
+      "objective": "초기화 직후의 출력과 상태가 정해진 초기값임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 지정 없이 초기화, 평가 호출 전",
+      "inputs": "없음(초기화 직후 조회)",
+      "procedure": [
+        "초기화",
+        "lock_ctrl_get_result 호출"
+      ],
+      "expected": "lock_left = RELEASE, lock_right = RELEASE, state = NORMAL, 모든 input_validity = STALE, reason = priority_reason = warning = command_status = NONE",
+      "techniques": [
+        "요구사항 기반 테스트",
+        "WoW 검증"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-019",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-039"
+      ],
+      "objective": "초기 출력을 LOCK으로 지정해 초기화하면 초기 출력이 LOCK임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK 지정",
+      "inputs": "initial_outputs = (LOCK, LOCK)",
+      "procedure": [
+        "지정해 초기화",
+        "결과 조회"
+      ],
+      "expected": "lock_left = LOCK, lock_right = LOCK",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-020",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-013",
+        "SWR-025"
+      ],
+      "objective": "첫 스냅샷을 받기 전의 평가에서는 모든 입력이 STALE임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE, 스냅샷 송신 전",
+      "inputs": "스냅샷 없음, now_ms = 0",
+      "procedure": [
+        "초기화 직후 스냅샷 없이 0 ms에 평가"
+      ],
+      "expected": "모든 input_validity = STALE, state = DEGRADED, reason = INPUT_STALE, 출력 RELEASE 유지",
+      "techniques": [
+        "WoW 검증",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-021",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-040",
+        "SAF-003"
+      ],
+      "objective": "평가 시각 경계: 직전보다 작으면 거절, 같거나 크면 허용",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "now_ms = 100(성공) 후 99, 100, 101",
+      "procedure": [
+        "100 ms에 평가",
+        "99 ms로 평가해 반환 값 확인",
+        "100 ms로 평가",
+        "101 ms로 평가"
+      ],
+      "expected": "99 ms: STATUS_ERR_TIME이고 결과 불변. 100, 101 ms: STATUS_OK",
+      "techniques": [
+        "경계값 분석",
+        "동치 클래스",
+        "결함 주입"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-022",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-046",
+        "SAF-005"
+      ],
+      "objective": "스냅샷 시각이 직전에 받아들인 스냅샷보다 작으면 스냅샷 전체를 거절함을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "100 ms 정상 스냅샷 후 시각 99 스냅샷(now 110)",
+      "procedure": [
+        "100 ms에 평가",
+        "시각 99 스냅샷을 110 ms에 평가",
+        "시각 120 정상 스냅샷을 120 ms에 평가"
+      ],
+      "expected": "두 번째: 모든 input_validity = INVALID, state = DEGRADED, 출력 LOCK 유지, 반환 STATUS_OK. 세 번째: state = NORMAL",
+      "techniques": [
+        "경계값 분석",
+        "결함 주입"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-023",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-046",
+        "SAF-005"
+      ],
+      "objective": "스냅샷 시각이 평가 시각보다 크면(미래) 거절함을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "스냅샷 시각 200, now_ms 120",
+      "procedure": [
+        "시각 200 스냅샷을 120 ms에 평가"
+      ],
+      "expected": "모든 input_validity = INVALID, state = DEGRADED, 출력 LOCK 유지",
+      "techniques": [
+        "경계값 분석",
+        "결함 주입"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-024",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-046",
+        "SAF-005"
+      ],
+      "objective": "스냅샷 시각이 누락이면 거절함을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "timestamp_ms.present = false",
+      "procedure": [
+        "시각 누락 스냅샷으로 평가"
+      ],
+      "expected": "모든 input_validity = INVALID, state = DEGRADED",
+      "techniques": [
+        "동치 클래스",
+        "오류 추측"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-025",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-033"
+      ],
+      "objective": "유효한 운전자 명령은 ACCEPTED이고 출력과 state를 바꾸지 않음을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "side = all(2), action = unlock(1), source = voice(2)",
+      "procedure": [
+        "명령을 담아 10 ms에 평가"
+      ],
+      "expected": "command_status = ACCEPTED, lock_left = LOCK, lock_right = LOCK 유지, state = NORMAL",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-026",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-033"
+      ],
+      "objective": "side가 값 집합 밖(3)이면 REJECTED임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "side = 3, action = 0, source = 0",
+      "procedure": [
+        "명령을 담아 10 ms에 평가"
+      ],
+      "expected": "command_status = REJECTED, 출력 LOCK 유지",
+      "techniques": [
+        "동치 클래스",
+        "경계값 분석"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-027",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-033"
+      ],
+      "objective": "action 필드가 누락이면 REJECTED임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "action.present = false",
+      "procedure": [
+        "명령을 담아 10 ms에 평가"
+      ],
+      "expected": "command_status = REJECTED",
+      "techniques": [
+        "동치 클래스",
+        "오류 추측"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-028",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-033"
+      ],
+      "objective": "명령이 없는 평가는 command_status가 NONE임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "명령 없음",
+      "procedure": [
+        "명령 없이 10 ms에 평가"
+      ],
+      "expected": "command_status = NONE",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "NTC-001",
+      "sheet": "비기능",
+      "basis_ids": [
+        "SWR-026",
+        "SAF-001"
+      ],
+      "objective": "충돌 CONFIRMED 스냅샷 시각 T부터 출력 확정까지 300 ms 이내",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "T = 100 ms에 CONFIRMED 스냅샷, 호출 주기 10 ms",
+      "procedure": [
+        "90 ms까지 정상 평가",
+        "100 ms 스냅샷(T)에 CONFIRMED를 담아 T 이후 처음 호출되는 평가(≤ T+10 ms)에서 결과 확인"
+      ],
+      "expected": "처음 호출되는 평가의 now_ms − T ≤ 10 ms(≤ 300 ms)이고 그 평가에서 두 출력이 RELEASE",
+      "techniques": [
+        "경계값 분석",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "NTC-002",
+      "sheet": "비기능",
+      "basis_ids": [
+        "SWR-027",
+        "SAF-003"
+      ],
+      "objective": "마지막 수신 후 200 ms 초과 시점부터 100 ms 이내에 DEGRADED",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
+      "inputs": "마지막 수신 T = 100 ms, 평가 주기 10 ms",
+      "procedure": [
+        "100 ms에 평가",
+        "10 ms 간격으로 스냅샷 없이 평가하며 처음 DEGRADED가 되는 now_ms를 기록"
+      ],
+      "expected": "처음 DEGRADED가 되는 now_ms = 310 ms (T+200 ms 초과 후 첫 평가) 이며 T+300 ms 이하",
+      "techniques": [
+        "경계값 분석",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "NTC-003",
+      "sheet": "비기능",
+      "basis_ids": [
+        "SWR-031"
+      ],
+      "objective": "평가 한 번의 실행 시간이 10 ms 이하",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK, 정상·충돌·sensor_fault·무효·명령 입력을 섞음",
+      "inputs": "혼합 입력 1,000회",
+      "procedure": [
+        "평가마다 std::chrono::steady_clock으로 소요 시간을 측정",
+        "최댓값을 구함"
+      ],
+      "expected": "최댓값 ≤ 10 ms",
+      "techniques": [
+        "경계값 분석",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "NTC-004",
+      "sheet": "비기능",
+      "basis_ids": [
+        "SWR-028",
+        "SWR-041",
+        "SWR-037"
+      ],
+      "objective": "제품 코드가 C11로 Clang에서 경고 없이 빌드됨을 확인",
+      "preconditions": "Docker 컨테이너 claudeclangbuild(Clang 23.1.6)",
+      "inputs": "소스 src/",
+      "procedure": [
+        "tools/run.sh build 실행",
+        "빌드 로그에서 경고와 오류 확인"
+      ],
+      "expected": "빌드 성공(종료 코드 0), 경고 0건(-Wall -Wextra -Werror), 컴파일러는 clang, 표준은 -std=c11",
+      "techniques": [
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "NTC-005",
+      "sheet": "비기능",
+      "basis_ids": [
+        "SWR-029",
+        "SWR-042"
+      ],
+      "objective": "동적 메모리 함수와 재귀 호출이 없음을 확인",
+      "preconditions": "Docker 컨테이너 claudeclangbuild",
+      "inputs": "소스 src/",
+      "procedure": [
+        "tools/run.sh rules 실행",
+        "금지 호출 검사 결과 확인"
+      ],
+      "expected": "금지 호출 검사 B1, B2 위반 0건, 판정: 통과",
+      "techniques": [
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "NTC-006",
+      "sheet": "비기능",
+      "basis_ids": [
+        "SWR-038",
+        "SWR-043"
+      ],
+      "objective": "모든 함수가 값을 반환하고 return이 끝에 한 번뿐임을 확인",
+      "preconditions": "Docker 컨테이너 claudeclangbuild",
+      "inputs": "소스 src/",
+      "procedure": [
+        "tools/run.sh rules 실행",
+        "반환 규칙 검사 결과 확인"
+      ],
+      "expected": "반환 규칙 RT1~RT3 위반 0건, 판정: 통과",
+      "techniques": [
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "NTC-007",
+      "sheet": "비기능",
+      "basis_ids": [
+        "SWR-032",
+        "SWR-047"
+      ],
+      "objective": "시스템 시계와 난수 함수 호출이 없음을 확인",
+      "preconditions": "Docker 컨테이너 claudeclangbuild",
+      "inputs": "소스 src/",
+      "procedure": [
+        "tools/run.sh rules 실행",
+        "금지 호출 검사 B3 결과 확인"
+      ],
+      "expected": "B3 위반 0건, 판정: 통과",
+      "techniques": [
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    }
+  ],
+  "pict_models": [],
+  "issues": [
+    {
+      "id": "Q-01",
+      "basis_id": "SWR-008",
+      "question": "OEM 질의 Q-17: STALE인 충돌 입력으로 해제를 유지할지(요구사항 명세 3절). 요구사항 명세는 새로 적용하지 않는 것으로 가정(A-04)",
+      "impact": "FTC-008은 이 가정을 확인하는 제안 케이스. OEM 답변에 따라 기대값이 바뀔 수 있다"
+    },
+    {
+      "id": "Q-02",
+      "basis_id": "SWR-013",
+      "question": "OEM 질의 Q-01/Q-14: 평가 주기 10 ms(A-01)와 상태 복귀 즉시성(A-08)은 가정",
+      "impact": "NTC-001, NTC-002, FTC-006의 시각 기대값이 가정에 의존"
+    }
+  ],
+  "template": null
+}

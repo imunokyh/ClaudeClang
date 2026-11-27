@@ -19,7 +19,7 @@
 #   integration   통합 테스트 성공률 100% + 함수 커버리지 100%      (SWE.5)
 #   tdd           TDD 테스트 성공률 100%, 커버리지는 별도 측정(보고 전용)
 #   trace         요구사항 ↔ 설계 ↔ 코드 ↔ 테스트 양방향 추적성
-#   system        SW 검증(SWE.6) 시험 명세 검증 = 요구사항 커버리지 100%
+#   system        SW 검증(SWE.6) 시험 명세 검증 = 요구사항 커버리지 100%, tests/system 실행 성공률 100%
 #   all           위 전부 (hitl-reviewed 제외). PR 전에 실행
 #
 # 소스(src/*.c)나 해당 산출물이 아직 없으면 그 검사는 "건너뜀"을 출력하고 통과한다(문서만 있는 단계).
@@ -276,7 +276,24 @@ cmd_system() {
     mkdir -p "${REPORTS}/system"
     # build_workbook.py 는 요구사항(테스트 베이시스) 커버리지·양방향 추적성이 100%가 아니면 오류로 실패한다.
     python3 "${SKILLS}/system-test-case-generator/scripts/build_workbook.py" "${spec}" \
-        --out "${REPORTS}/system/test-spec.xlsx"
+        --out "${REPORTS}/system/test-spec.xlsx" || return 1
+    # 명세의 TC를 수행하는 시스템 테스트(tests/system)가 있으면 실행하고 성공률 100%를 요구한다.
+    if [ -d tests/system ]; then
+        cmake_build "${BUILD_DEBUG}" OFF
+        local exe status=0
+        for exe in "${BUILD_DEBUG}"/tests/system/st_*; do
+            [ -x "${exe}" ] || continue
+            "${exe}" --gtest_output="xml:${REPORTS}/system/$(basename "${exe}").xml" || status=1
+        done
+        for xml in "${REPORTS}"/system/st_*.xml; do
+            [ -f "${xml}" ] && sed -i 's/classname="/classname="system./g' "${xml}"
+        done
+        if [ "${status}" -ne 0 ]; then
+            echo "판정: 실패 — 시스템 테스트 실패가 있습니다"
+            return 1
+        fi
+        echo "판정: 통과 (시스템 테스트 성공률 100%)"
+    fi
 }
 
 cmd_all() {

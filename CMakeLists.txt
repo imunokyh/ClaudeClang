@@ -34,7 +34,7 @@ add_library(cl_product INTERFACE)
 target_link_libraries(cl_product INTERFACE cl_lock_ctrl cl_input_guard cl_arbiter)
 
 enable_testing()
-foreach(kind tdd unit integration)
+foreach(kind tdd unit integration system)
     if(EXISTS ${CMAKE_SOURCE_DIR}/tests/${kind}/CMakeLists.txt)
         add_subdirectory(tests/${kind})
     endif()
