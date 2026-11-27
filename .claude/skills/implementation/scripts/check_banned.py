@@ -38,7 +38,7 @@ def strip_noise(text):
     @param text C 소스 텍스트
     @return 처리된 텍스트
     """
-    pattern = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\.|[^"\\n])*"|\'(?:\.|[^\'\\n])*\'', re.S)
+    pattern = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'', re.S)
     return pattern.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
 
 

@@ -36,6 +36,16 @@ class BannedTest(unittest.TestCase):
         errors = run("int f(void)\n{\n    return fopen(0, 0) == 0;\n}\n")
         self.assertTrue(any(e.startswith("B4") for e in errors))
 
+    def test_escaped_quotes_and_braces_in_string(self):
+        """@brief 이스케이프된 따옴표와 중괄호가 있는 문자열도 지워서 함수 본문 경계가 어긋나지 않는다."""
+        src = (
+            "const char *a(void)\n{\n    const char *p = \"{\\\"k\\\":\\\"\";\n    return p;\n}\n"
+            "int b(void)\n{\n    return 1;\n}\n"
+        )
+        self.assertEqual(run(src), [])
+        text = check_banned.strip_noise(src)
+        self.assertEqual(text.count("{"), text.count("}"))
+
     def test_direct_recursion_detected(self):
         """@brief 직접 재귀를 검출한다."""
         errors = run("int f(int n)\n{\n    return f(n - 1);\n}\n")
