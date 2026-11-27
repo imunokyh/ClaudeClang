@@ -33,11 +33,7 @@ class BannedTest(unittest.TestCase):
 
     def test_file_io_detected(self):
         """@brief 파일 입출력 호출을 B4로 검출한다."""
-        errors = run("int f(void)
-{
-    return fopen(0, 0) == 0;
-}
-")
+        errors = run("int f(void)\n{\n    return fopen(0, 0) == 0;\n}\n")
         self.assertTrue(any(e.startswith("B4") for e in errors))
 
     def test_direct_recursion_detected(self):
