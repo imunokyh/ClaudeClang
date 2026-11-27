@@ -22,6 +22,9 @@ ALLOC = {"malloc", "calloc", "realloc", "free", "strdup", "strndup", "aligned_al
 ## B3 금지 함수
 CLOCK = {"time", "clock", "clock_gettime", "gettimeofday", "timespec_get", "rand", "srand", "random", "srandom",
          "localtime", "gmtime", "mktime"}
+## B4 금지 함수(파일·저장소 입출력)
+FILEIO = {"fopen", "freopen", "fclose", "fread", "fwrite", "fprintf", "fscanf", "fputs", "fgets", "fputc", "fgetc",
+          "fflush", "open", "creat", "mkstemp", "tmpfile", "remove", "rename", "unlink", "mmap"}
 ## 호출처럼 보이지만 호출이 아닌 예약어
 KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof", "defined", "_Alignof", "_Static_assert", "do", "else"}
 
@@ -88,6 +91,8 @@ def analyze(files):
                 errors.append(f"B1 {path}:{line}: 동적 메모리 함수 {callee}() 호출 금지")
             elif callee in CLOCK:
                 errors.append(f"B3 {path}:{line}: 시계·난수 함수 {callee}() 호출 금지")
+            elif callee in FILEIO:
+                errors.append(f"B4 {path}:{line}: 파일·저장소 입출력 함수 {callee}() 호출 금지")
             if callee in defined:
                 callees.add(callee)
         graph[name] = callees
@@ -129,7 +134,7 @@ def main(argv=None):
     @param argv 인자 목록
     @return 종료 코드
     """
-    parser = argparse.ArgumentParser(description="금지 호출 검사(B1 동적 메모리, B2 재귀, B3 시계·난수)")
+    parser = argparse.ArgumentParser(description="금지 호출 검사(B1 동적 메모리, B2 재귀, B3 시계·난수, B4 파일 입출력)")
     parser.add_argument("--src", default="src", help="소스 디렉터리")
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
