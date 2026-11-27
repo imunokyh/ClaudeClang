@@ -59,10 +59,10 @@
 | FN-027 | `static bool is_valid_lock_outputs(const lock_outputs_t *outputs)` | MOD-002 | 아니오 | 두 출력 값이 모두 열거 범위 안인지 판정한다 | MOD-002, CMP-002 |
 | FN-029 | `static status_t decide_doors(const arbiter_input_t *input, decision_t *out)` | MOD-002 | 아니오 | 문(좌, 우)마다 문 규칙을 적용해 출력, 결정 이유, 접근위험 기록을 정한다 | MOD-002, CMP-002 |
 | FN-030 | `static door_result_t decide_door(const arbiter_input_t *input, door_t door, door_approach_t *approach)` | MOD-002 | 아니오 | 문 하나에 문 규칙 9~12를 적용하고 그 문의 접근위험 기록을 갱신한다 | MOD-002, CMP-002 |
-| FN-031 | `static approach_step_t step_approach(door_approach_t current, bool risk, bool risk_cleared, bool release, uint32_t now_ms)` | MOD-002 | 아니오 | 접근위험 입력과 해제 요청으로 문의 억제·override 기록을 한 단계 진행한다 | MOD-002, CMP-002 |
+| FN-031 | `static approach_step_t step_approach(door_approach_t current, bool risk, bool release, uint32_t now_ms)` | MOD-002 | 아니오 | 접근위험 입력과 해제 요청으로 문의 억제·override 기록을 한 단계 진행한다 | MOD-002, CMP-002 |
 | FN-032 | `static bool command_matches(const checked_command_t *command, door_t door, int action)` | MOD-002 | 아니오 | 유효한 명령이 이 문을 대상으로 하는 해당 동작인지 판정한다 | MOD-002, CMP-002 |
 | FN-033 | `static bool targets_door(int side, door_t door)` | MOD-002 | 아니오 | 명령의 side가 이 문을 가리키는지 판정한다 | MOD-002, CMP-002 |
-| FN-034 | `static bool is_speed_at_least(const normalized_inputs_t *inputs, int64_t threshold)` | MOD-002 | 아니오 | 차속이 VALID이고 기준 이상인지 판정한다 | MOD-002, CMP-002 |
+| FN-034 | `static bool is_speed_at_least(const normalized_inputs_t *inputs, int64_t threshold)` | MOD-002 | 아니오 | 차속 판정 값이 기준 이상인지 판정한다 | MOD-002, CMP-002 |
 | FN-035 | `static reason_t apply_fallback_reason(const normalized_inputs_t *inputs, reason_t reason)` | MOD-002 | 아니오 | 문 규칙이 없어 이유가 NONE이면 충돌 PENDING 이유를 적용한다 | MOD-002, CMP-002 |
 | FN-036 | `static lock_cmd_t get_door_output(const lock_outputs_t *outputs, door_t door)` | MOD-002 | 아니오 | 문의 출력 값을 꺼낸다 | MOD-002, CMP-002 |
 | FN-028 | `static bool is_valid_initial_outputs(const lock_outputs_t *outputs)` | MOD-003 | 아니오 | 초기 출력의 두 값이 모두 열거 범위 안인지 판정한다 | MOD-003, CMP-003 |
@@ -202,17 +202,17 @@
 ### FN-014 `arbiter_decide`
 - **매개변수**: `input`(inputs 포인터, previous, command, now_ms, approach)와 `out` 출력. `input->inputs`는 NULL 불가, `previous`의 값은 LOCK_RELEASE 또는 LOCK_LOCK이어야 한다
 - **반환값**: `STATUS_OK`, `STATUS_ERR_PARAM`(NULL 또는 previous의 값이 범위 밖)
-- **알고리즘**: ① 검증. ② `out->approach = input->approach`(기본은 기록 유지). ③ `rule = select_global_rule(inputs)`(FN-017). ④ 전역 규칙이 있으면 `apply_global_rule`(FN-018), 없으면 `decide_doors`(FN-029). ⑤ `out->reason = apply_fallback_reason(...)`(FN-035). ⑥ `warning`: FAULT 조건(`has_item_value(sensor_fault, 1)`)이면 `WARNING_SENSOR_FAULT`, 아니면 `WARNING_NONE`. ⑦ `state = decide_state(fault, degraded, off)`(FN-019). degraded = INVALID 있음 또는 STALE 있음, off = ignition_on이 VALID이고 0.
+- **알고리즘**: ① 검증. ② `out->approach = input->approach`(기본은 기록 유지). ③ `rule = select_global_rule(inputs)`(FN-017). ④ `apply_global_rule`(FN-018)로 출력과 이유를 채우고(RULE_NONE이면 직전 출력 유지와 이유 NONE), 전역 규칙이 없으면(RULE_NONE) 이어서 `decide_doors`(FN-029)가 문별로 덮어쓴다. ⑤ `out->reason = apply_fallback_reason(...)`(FN-035). ⑥ `warning`: FAULT 조건(`has_item_value(sensor_fault, 1)`)이면 `WARNING_SENSOR_FAULT`, 아니면 `WARNING_NONE`. ⑦ `state = decide_state(fault, degraded, off)`(FN-019). degraded = INVALID 있음 또는 STALE 있음, off = ignition_on이 VALID이고 0.
 - **사후 조건**: `STATUS_OK`일 때만 `*out` 갱신.
 
-| 규칙 | C1 input != NULL | C2 out != NULL | C3 input->inputs != NULL | C4 `is_valid_lock_outputs(previous)` | C5 전역 규칙 있음 | 결과 |
+| 규칙 | C1 input != NULL | C2 out != NULL | C3 input->inputs != NULL | C4 `is_valid_lock_outputs(previous)` | C5 규칙이 RULE_NONE | 결과 |
 |---|---|---|---|---|---|---|
 | R1 | F | - | - | - | - | STATUS_ERR_PARAM |
 | R2 | T | F | - | - | - | STATUS_ERR_PARAM |
 | R3 | T | T | F | - | - | STATUS_ERR_PARAM |
 | R4 | T | T | T | F | - | STATUS_ERR_PARAM |
-| R5 | T | T | T | T | T | 전역 규칙 적용, STATUS_OK |
-| R6 | T | T | T | T | F | 문 규칙 적용, STATUS_OK |
+| R5 | T | T | T | T | F(전역 규칙 있음) | 전역 규칙 적용, STATUS_OK |
+| R6 | T | T | T | T | T(RULE_NONE) | 문 규칙 적용, STATUS_OK |
 
 ### FN-015 `has_item_value`
 - `inputs->validity[item] == VALIDITY_VALID && inputs->value[item] == expected`.
@@ -239,7 +239,7 @@
 | R6 | C6 | RULE_FIRE | FIRE | 두 출력 RELEASE |
 | R7 | C7 | RULE_OVERTEMPERATURE | OVERTEMPERATURE | 두 출력 RELEASE |
 | R8 | C8 | RULE_ADULT_PRESENT | ADULT_PRESENT | 두 출력 RELEASE |
-| R9 | 모두 거짓 | RULE_DOORS | (문 규칙이 정함) | (문 규칙이 정함) |
+| R9 | 모두 거짓 | RULE_NONE | (문 규칙이 정함) | (문 규칙이 정함) |
 
 ### FN-018 `apply_global_rule`
 | 규칙 | `out->outputs` | `out->reason` |
@@ -252,9 +252,9 @@
 | RULE_FIRE | left, right = LOCK_RELEASE | REASON_FIRE |
 | RULE_OVERTEMPERATURE | left, right = LOCK_RELEASE | REASON_OVERTEMPERATURE |
 | RULE_ADULT_PRESENT | left, right = LOCK_RELEASE | REASON_ADULT_PRESENT |
-| RULE_DOORS | 호출하지 않는다(FN-014가 FN-029를 부른다) | |
+| RULE_NONE | `*previous` | REASON_NONE |
 
-`arbiter_rule_t`의 모든 값을 처리하며 `default`는 없다. RULE_DOORS는 아무 것도 바꾸지 않는다. 반환 `STATUS_OK`.
+`arbiter_rule_t`의 모든 값을 처리하며 `default`는 없다. 반환 `STATUS_OK`.
 
 ### FN-019 `decide_state`
 | 규칙 | C1 fault_condition | C2 degraded_condition | C3 off_condition | 결과 |
@@ -275,7 +275,7 @@
 
 ### FN-030 `decide_door`
 - **매개변수**: `input`, `door`, `approach`(그 문의 접근위험 기록 입출력)
-- **알고리즘**: ① 이 문의 접근위험 항목, ISOFIX 항목은 문 번호로 고르는 상수 표(`RISK_ITEMS`, `ISOFIX_ITEMS`)에서 찾는다. ② `risk = has_item_value(접근위험, 1)`, `risk_cleared = has_item_value(접근위험, 0)`, `release = command_matches(command, door, UNLOCK)`, `lock = command_matches(command, door, LOCK)`. ③ `step = step_approach(*approach, risk, risk_cleared, release, now_ms)`(FN-031), `*approach = step.next`. ④ 아래 결정표로 출력, 이유, 순위를 정한다.
+- **알고리즘**: ① 이 문의 접근위험 항목, ISOFIX 항목은 문 번호로 고르는 상수 표(`RISK_ITEMS`, `ISOFIX_ITEMS`)에서 찾는다. ② `risk = has_item_value(접근위험, 1)`(전역 규칙 3, 4를 통과했으므로 모든 입력이 VALID이고 접근위험 FALSE는 `!risk`다), `release = command_matches(command, door, UNLOCK)`, `lock = command_matches(command, door, LOCK)`. ③ `step = step_approach(*approach, risk, release, now_ms)`(FN-031), `*approach = step.next`. ④ 아래 결정표로 출력, 이유, 순위를 정한다.
 
 | 규칙 | C1 step.locked | C2 ISOFIX VALID TRUE | C3 `is_speed_at_least(inputs, 30)` | C4 release | C5 lock | 출력 | 이유 | 순위 |
 |---|---|---|---|---|---|---|---|---|
@@ -289,15 +289,14 @@
 ### FN-031 `step_approach`
 - 값 전달로 현재 기록을 받아 새 기록(`next`), `locked`(그 평가에서 접근위험 규칙이 문을 잠그는가), `overridden`(그 평가에서 override가 성립했는가)을 돌려준다. 억제 창은 10,000 ms(`APPROACH_WINDOW_MS`)다.
 
-| 규칙 | C1 risk_cleared | C2 risk | C3 !override_active | C4 release | C5 pending | C6 `now_ms - pending_ms <= 10000` | next | locked | overridden |
-|---|---|---|---|---|---|---|---|---|---|
-| R1 | T | - | - | - | - | - | pending=F, override_active=F | F | F |
-| R2 | F | F | - | - | - | - | 변경 없음 | F | F |
-| R3 | F | T | F | - | - | - | 변경 없음 | F | F |
-| R4 | F | T | T | F | - | - | 변경 없음 | T | F |
-| R5 | F | T | T | T | F | - | pending=T, pending_ms=now_ms | T | F |
-| R6 | F | T | T | T | T | F | pending=T, pending_ms=now_ms (새 첫 억제) | T | F |
-| R7 | F | T | T | T | T | T | override_active=T, pending=F | F | T |
+| 규칙 | C1 risk | C2 !override_active | C3 release | C4 pending | C5 `now_ms - pending_ms <= 10000` | next | locked | overridden |
+|---|---|---|---|---|---|---|---|---|
+| R1 | F | - | - | - | - | pending=F, override_active=F (접근위험 해제) | F | F |
+| R2 | T | F | - | - | - | 변경 없음 | F | F |
+| R3 | T | T | F | - | - | 변경 없음 | T | F |
+| R4 | T | T | T | F | - | pending=T, pending_ms=now_ms | T | F |
+| R5 | T | T | T | T | F | pending=T, pending_ms=now_ms (새 첫 억제) | T | F |
+| R6 | T | T | T | T | T | override_active=T, pending=F | F | T |
 
 ### FN-032 `command_matches`
 | 규칙 | C1 `command->status == COMMAND_ACCEPTED` | C2 `command->action == action` | C3 `targets_door(side, door)` | 결과 |
@@ -315,11 +314,12 @@
 | R3 | F | F | false |
 
 ### FN-034 `is_speed_at_least`
-| 규칙 | C1 `validity[차속] == VALID` | C2 `value[차속] >= threshold` | 결과 |
-|---|---|---|---|
-| R1 | T | T | true |
-| R2 | F | - | false |
-| R3 | T | F | false |
+- `inputs->value[ITEM_VEHICLE_SPEED] >= threshold`. 호출 전에 전역 규칙 3, 4가 모든 입력의 VALID를 보장하므로 입력 상태를 다시 검사하지 않는다(독립 효과를 보일 수 없는 중복 조건을 피한다).
+
+| 규칙 | C1 `value[차속] >= threshold` | 결과 |
+|---|---|---|
+| R1 | T | true |
+| R2 | F | false |
 
 ### FN-035 `apply_fallback_reason`
 | 규칙 | C1 `reason == REASON_NONE` | C2 `has_item_value(crash_status, CRASH_PENDING)` | 결과 |
@@ -487,3 +487,4 @@ flowchart LR
 | 0.1 | 2026-11-27 | MOD-001, MOD-002, MOD-003, MOD-004, MIF-001, MIF-002, MIF-003, MIF-004, FN-001, FN-002, FN-003, FN-004, FN-005, FN-006, FN-007, FN-008, FN-009, FN-010, FN-011, FN-012, FN-013, FN-014, FN-015, FN-016, FN-017, FN-018, FN-019, FN-020, FN-021, FN-022, FN-023, FN-024, FN-025, FN-026 | 이터레이션 1 최초 작성 (단계 리뷰는 사용자 지시로 생략) | 없음 |
 | 0.2 | 2026-11-27 | FN-004, FN-005, FN-006, FN-007, FN-008, FN-009, FN-010, FN-014, FN-018, FN-020, FN-021, FN-024, FN-027, FN-028 | 구현 전 테스트 가능성 점검: MC/DC로 독립 효과를 보일 수 없는 중복 조건(범위, NaN) 제거, 항상 성공하는 상태 반환 체인과 도달 불가 default 제거, 매개변수 검사 분리(FN-027, 028) | 없음 |
 | 0.3 | 2026-11-27 | FN-003, FN-014, FN-017, FN-018, FN-019, FN-024, FN-025, FN-026, FN-029, FN-030, FN-031, FN-032, FN-033, FN-034, FN-035, FN-036 | 이터레이션 2: 전역 해제 규칙, 문 단위 규칙, 접근위험 억제·override 기록, 검사한 명령 구조체. 단계 리뷰는 사용자 지시로 생략 | 아키텍처 설계서 |
+| 0.4 | 2026-11-27 | FN-014, FN-017, FN-018, FN-030, FN-031, FN-034 | 이터레이션 2 구현 전 테스트 가능성 점검: 독립 효과를 보일 수 없는 중복 조건(접근위험 해제 판정, 차속 입력 상태) 제거, 전역 규칙 없음을 RULE_NONE으로 통일 | 없음 |

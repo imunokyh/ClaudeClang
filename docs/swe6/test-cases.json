@@ -71,7 +71,7 @@
       "id": "SWR-035",
       "title": "state 결정",
       "type": "기능",
-      "text": "FAULT 조건이면 FAULT, 아니면 DEGRADED 조건이면 DEGRADED, 아니면 NORMAL. 원인이 사라진 평가에서 NORMAL.",
+      "text": "FAULT 조건이면 FAULT, DEGRADED 조건이면 DEGRADED, ignition off이면 OFF, 아니면 NORMAL.",
       "asil": "ASIL B",
       "technique_notes": "경계값 분석: 조건 조합 표(결정 테이블)로 덮고 수치 경계는 없다."
     },
@@ -79,7 +79,7 @@
       "id": "SWR-023",
       "title": "결정 규칙 우선순위",
       "type": "기능",
-      "text": "결정 규칙표의 규칙 중 처음 성립한 것으로 출력과 이유를 정한다.",
+      "text": "결정 규칙표의 규칙(전역 1~8, 문 9~12, 13, 14) 중 처음 성립한 것으로 출력과 이유를 정한다.",
       "asil": "ASIL B",
       "technique_notes": "경계값 분석: 규칙 조합 표(결정 테이블)로 덮고 수치 경계는 없다."
     },
@@ -95,7 +95,7 @@
       "id": "SWR-025",
       "title": "초기값",
       "type": "기능",
-      "text": "초기화 직후 출력, state, 입력 상태, 이유, 경고, 명령 상태를 정해진 초기값으로 둔다.",
+      "text": "초기화 직후 출력, state, 입력 상태, 이유, 경고, 명령 상태, override 상태를 정해진 초기값으로 둔다.",
       "asil": "ASIL B",
       "technique_notes": "동치 클래스, 경계값 분석: 입력이 없는 초기값 요구라 입력 분할·경계가 없다."
     },
@@ -127,7 +127,7 @@
       "id": "SWR-033",
       "title": "운전자 명령 검사",
       "type": "기능",
-      "text": "명령 필드가 누락이거나 값 집합 밖이면 REJECTED, 유효하면 ACCEPTED, 없으면 NONE. 출력과 state를 바꾸지 않는다.",
+      "text": "명령 필드가 누락이거나 값 집합 밖이면 REJECTED, 유효하면 ACCEPTED, 없으면 NONE. 거절된 명령은 출력과 state를 바꾸지 않는다.",
       "asil": "QM",
       "technique_notes": ""
     },
@@ -258,6 +258,94 @@
       "text": "무효 입력은 판정에 쓰지 않고 DEGRADED, 직전 출력 유지.",
       "asil": "ASIL B",
       "technique_notes": ""
+    },
+    {
+      "id": "SWR-020",
+      "title": "ignition off",
+      "type": "기능",
+      "text": "ignition_on이 VALID로 FALSE이면(전역 규칙 1~4가 없을 때) 두 출력을 RELEASE로 하고 이유 IGNITION_OFF, state OFF.",
+      "asil": "QM",
+      "technique_notes": "경계값 분석: boolean 입력이라 경계가 없고 동치 클래스(TRUE, FALSE)로 덮는다."
+    },
+    {
+      "id": "SWR-017",
+      "title": "화재·과온·성인 해제",
+      "type": "기능",
+      "text": "fire_detected, overtemperature_detected, adult_present 중 TRUE가 있으면 두 출력을 RELEASE로 하고 이유 FIRE, OVERTEMPERATURE, ADULT_PRESENT(동시이면 이 순서).",
+      "asil": "QM",
+      "technique_notes": "경계값 분석: boolean 입력이라 경계가 없고 동치 클래스(TRUE, FALSE)로 덮는다."
+    },
+    {
+      "id": "SWR-005",
+      "title": "접근위험 잠금·해제 억제",
+      "type": "기능",
+      "text": "접근위험이 VALID로 TRUE인 문(override 아님)은 LOCK, 이유 APPROACH_RISK, 그 문의 해제 요청은 출력을 바꾸지 않는다.",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: boolean 입력이라 경계가 없고 동치 클래스(TRUE, FALSE)로 덮는다."
+    },
+    {
+      "id": "SWR-009",
+      "title": "좌우 독립",
+      "type": "기능",
+      "text": "한쪽 문의 접근위험, ISOFIX, override는 다른 문의 출력과 override에 영향을 주지 않는다.",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: 두 문의 독립성 요구라 경계가 없다."
+    },
+    {
+      "id": "SWR-048",
+      "title": "억제 기록과 10초 창",
+      "type": "기능",
+      "text": "접근위험 문에 해제 요청이 오면 처음 억제 시각을 기록하고, 10,000 ms 이하에 같은 문의 해제 요청이 오면 override, 초과하면 새 첫 억제.",
+      "asil": "ASIL B",
+      "technique_notes": "동치 클래스: 입력이 해제 요청 이벤트와 경과 시간뿐이라 시간 경계(10,000 ms 이하/초과)와 상태 전이로 덮는다."
+    },
+    {
+      "id": "SWR-006",
+      "title": "override",
+      "type": "기능",
+      "text": "억제 기록이 있는 문에 10,000 ms 이하 경과 후 같은 문의 해제 요청이 오면 override 성립, 해제 적용, 이유 APPROACH_OVERRIDE, 접근위험이 FALSE가 될 때까지 유지.",
+      "asil": "ASIL B",
+      "technique_notes": "동치 클래스: 입력이 해제 요청 이벤트와 경과 시간뿐이라 시간 경계(10,000 ms 이하/초과)와 상태 전이로 덮는다."
+    },
+    {
+      "id": "SWR-018",
+      "title": "ISOFIX 잠금",
+      "type": "기능",
+      "text": "isofix 입력이 VALID로 TRUE이면 해당 문을 LOCK(이유 ISOFIX). 반대쪽 문은 바꾸지 않는다.",
+      "asil": "QM",
+      "technique_notes": "경계값 분석: boolean 입력이라 경계가 없고 동치 클래스(TRUE, FALSE)로 덮는다."
+    },
+    {
+      "id": "SWR-003",
+      "title": "자동 잠금",
+      "type": "기능",
+      "text": "차속이 VALID로 3.0 km/h 이상이면 두 문을 LOCK(이유 AUTO_LOCK).",
+      "asil": "QM",
+      "technique_notes": ""
+    },
+    {
+      "id": "SWR-001",
+      "title": "운전자 명령 적용",
+      "type": "기능",
+      "text": "유효한 명령(lock/unlock, left/right/all)을 선택한 문에 적용(이유 DRIVER_COMMAND). 하위 규칙(접근위험, ISOFIX, 자동 잠금)이 있는 문과 전역 규칙이 성립한 평가에는 적용하지 않는다. 일회성 사건.",
+      "asil": "QM",
+      "technique_notes": "경계값 분석: 열거 입력이라 경계가 없고 동치 클래스(side, action 조합)로 덮는다."
+    },
+    {
+      "id": "SWR-002",
+      "title": "source 무관",
+      "type": "기능",
+      "text": "명령 source 네 값은 같은 방식으로 처리한다.",
+      "asil": "QM",
+      "technique_notes": "경계값 분석: 순서 없는 열거라 경계가 없다."
+    },
+    {
+      "id": "SAF-002",
+      "title": "접근위험 잠금(안전)",
+      "type": "기능",
+      "text": "접근위험이 VALID로 TRUE인 문을 LOCK하고 해제 요청을 억제하며 원인(APPROACH_RISK)을 기록한다. override가 성립한 문은 예외(질의 Q-22).",
+      "asil": "ASIL B",
+      "technique_notes": "경계값 분석: boolean 입력이라 경계가 없고 동치 클래스(TRUE, FALSE)로 덮는다."
     }
   ],
   "test_cases": [
@@ -667,7 +755,7 @@
         "초기화",
         "lock_ctrl_get_result 호출"
       ],
-      "expected": "lock_left = RELEASE, lock_right = RELEASE, state = NORMAL, 모든 input_validity = STALE, reason = priority_reason = warning = command_status = NONE",
+      "expected": "lock_left = RELEASE, lock_right = RELEASE, state = NORMAL, 모든 input_validity = STALE, reason = priority_reason = warning = command_status = NONE, override_left = override_right = FALSE",
       "techniques": [
         "요구사항 기반 테스트",
         "WoW 검증"
@@ -818,15 +906,16 @@
       "tc_id": "FTC-025",
       "sheet": "기능",
       "basis_ids": [
-        "SWR-033"
+        "SWR-033",
+        "SWR-001"
       ],
-      "objective": "유효한 운전자 명령은 ACCEPTED이고 출력과 state를 바꾸지 않음을 확인",
+      "objective": "유효한 운전자 명령(all, unlock)은 ACCEPTED이고 두 출력을 해제함을 확인",
       "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, 나머지 0)으로 스냅샷 송신",
       "inputs": "side = all(2), action = unlock(1), source = voice(2)",
       "procedure": [
         "명령을 담아 10 ms에 평가"
       ],
-      "expected": "command_status = ACCEPTED, lock_left = LOCK, lock_right = LOCK 유지, state = NORMAL",
+      "expected": "command_status = ACCEPTED, lock_left = RELEASE, lock_right = RELEASE, reason = DRIVER_COMMAND, state = NORMAL",
       "techniques": [
         "동치 클래스",
         "요구사항 기반 테스트"
@@ -1054,6 +1143,382 @@
       "origin": "기본",
       "pict_ref": "",
       "remarks": ""
+    },
+    {
+      "tc_id": "FTC-029",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-020"
+      ],
+      "objective": "ignition off에서 두 출력이 해제되고 OFF 상태가 됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "ignition_on = 0",
+      "procedure": [
+        "ignition_on = 0 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "lock_left = RELEASE, lock_right = RELEASE, state = OFF, reason = IGNITION_OFF (같은 평가에서)",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-030",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-017"
+      ],
+      "objective": "화재 입력 TRUE에서 두 출력이 해제됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "fire_detected = 1",
+      "procedure": [
+        "fire_detected = 1 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "두 출력 RELEASE, reason = FIRE",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-031",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-017"
+      ],
+      "objective": "과온 입력 TRUE에서 두 출력이 해제됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "overtemperature_detected = 1",
+      "procedure": [
+        "overtemperature_detected = 1 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "두 출력 RELEASE, reason = OVERTEMPERATURE",
+      "techniques": [
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-032",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-017"
+      ],
+      "objective": "성인 탑승 입력 TRUE에서 두 출력이 해제됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "adult_present = 1",
+      "procedure": [
+        "adult_present = 1 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "두 출력 RELEASE, reason = ADULT_PRESENT",
+      "techniques": [
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-033",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-017",
+        "SWR-023"
+      ],
+      "objective": "화재, 과온, 성인 탑승이 동시이면 이유가 FIRE임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "fire_detected = 1, overtemperature_detected = 1, adult_present = 1",
+      "procedure": [
+        "세 입력을 함께 담은 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "두 출력 RELEASE, reason = FIRE",
+      "techniques": [
+        "WoW 검증",
+        "결정 테이블"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-034",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-005",
+        "SWR-009",
+        "SAF-002"
+      ],
+      "objective": "좌 접근위험 TRUE에서 좌 문만 LOCK이 되고 우 문은 영향받지 않음을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "rear_left_approach_risk = 1, rear_right_approach_risk = 0",
+      "procedure": [
+        "좌 접근위험 TRUE 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "lock_left = LOCK, lock_right = RELEASE, reason = APPROACH_RISK",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-035",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-005",
+        "SWR-048",
+        "SAF-002"
+      ],
+      "objective": "접근위험 문에 대한 첫 해제 요청은 억제됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "좌 접근위험 TRUE에서 (side = left, action = unlock) 명령",
+      "procedure": [
+        "좌 접근위험 TRUE 스냅샷으로 10 ms에 평가",
+        "같은 스냅샷에 (left, unlock) 명령을 담아 20 ms에 평가"
+      ],
+      "expected": "20 ms: lock_left = LOCK 유지, reason = APPROACH_RISK, override_left = FALSE",
+      "techniques": [
+        "요구사항 기반 테스트",
+        "결함 주입"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-036",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-006",
+        "SWR-048",
+        "SAF-002"
+      ],
+      "objective": "첫 억제 후 정확히 10,000 ms에 같은 해제 요청이 오면 override임을 경계값으로 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "좌 접근위험 TRUE, (left, unlock) 명령을 10 ms와 10,010 ms에 입력(경과 10,000 ms), 그 사이 10 ms 간격 평가",
+      "procedure": [
+        "10 ms에 (left, unlock) 평가(첫 억제)",
+        "20 ms부터 10,000 ms까지 10 ms 간격으로 명령 없이 평가",
+        "10,010 ms에 (left, unlock) 평가"
+      ],
+      "expected": "10,010 ms: override_left = TRUE, lock_left = RELEASE, reason = APPROACH_OVERRIDE",
+      "techniques": [
+        "경계값 분석",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-037",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-006",
+        "SWR-048"
+      ],
+      "objective": "첫 억제 후 10,001 ms에 같은 해제 요청이 오면 override가 아니고 새 첫 억제임을 경계값으로 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "좌 접근위험 TRUE, (left, unlock) 명령을 10 ms와 10,020 ms에 입력(경과 10,010 ms)",
+      "procedure": [
+        "10 ms에 (left, unlock) 평가",
+        "20 ms부터 10,010 ms까지 10 ms 간격으로 명령 없이 평가",
+        "10,020 ms에 (left, unlock) 평가"
+      ],
+      "expected": "10,020 ms: override_left = FALSE, lock_left = LOCK(억제), reason = APPROACH_RISK. 이후 10,030 ms에 (left, unlock)을 다시 입력하면 override_left = TRUE",
+      "techniques": [
+        "경계값 분석",
+        "상태 전이"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-038",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-006"
+      ],
+      "objective": "override는 접근위험이 FALSE가 될 때까지 유지되고 FALSE에서 지워짐을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "override 성립 후 접근위험 TRUE 유지, 이후 FALSE",
+      "procedure": [
+        "FTC-036 절차로 override를 성립",
+        "다음 평가(접근위험 TRUE 유지)에서 상태 확인",
+        "접근위험을 0으로 바꿔 평가"
+      ],
+      "expected": "TRUE 유지 평가: override_left = TRUE, lock_left = RELEASE 유지. FALSE 평가: override_left = FALSE",
+      "techniques": [
+        "상태 전이",
+        "WoW 검증"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-039",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-018"
+      ],
+      "objective": "isofix_left만 TRUE이면 좌 문만 LOCK이고 우 문은 유지됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "isofix_left = 1, isofix_right = 0",
+      "procedure": [
+        "isofix_left = 1 스냅샷으로 10 ms에 평가",
+        "isofix_left = 0으로 20 ms에 평가"
+      ],
+      "expected": "10 ms: lock_left = LOCK, lock_right = RELEASE, reason = ISOFIX. 20 ms: lock_left = LOCK 유지(직전 출력)",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-040",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-003"
+      ],
+      "objective": "자동 잠금 경계: 2.9 km/h는 잠기지 않고 3.0 km/h부터 잠김",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "vehicle_speed_kph = 2.9, 3.0",
+      "procedure": [
+        "차속 2.9로 10 ms에 평가",
+        "차속 3.0으로 20 ms에 평가"
+      ],
+      "expected": "10 ms: 두 출력 RELEASE 유지. 20 ms: 두 출력 LOCK, reason = AUTO_LOCK",
+      "techniques": [
+        "경계값 분석",
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-041",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-001"
+      ],
+      "objective": "운전자 명령이 선택한 문과 동작에만 적용됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "(left, lock), 이어서 (right, lock), 이어서 (left, unlock), (right, unlock)",
+      "procedure": [
+        "각 명령을 담아 10 ms 간격으로 평가하며 매번 결과 확인"
+      ],
+      "expected": "(left, lock): LOCK, RELEASE. (right, lock): LOCK, LOCK. (left, unlock): RELEASE, LOCK. (right, unlock): RELEASE, RELEASE. 모두 reason = DRIVER_COMMAND",
+      "techniques": [
+        "동치 클래스",
+        "결정 테이블"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-042",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-002"
+      ],
+      "objective": "명령 source 네 값의 처리 결과가 같음을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "(all, lock) 명령에 source = physical_button(0), avn(1), voice(2), mobile_app(3)",
+      "procedure": [
+        "source마다 새로 초기화하고 10 ms에 평가"
+      ],
+      "expected": "네 경우 모두 두 출력 LOCK, reason = DRIVER_COMMAND, command_status = ACCEPTED",
+      "techniques": [
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-043",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-001",
+        "SWR-003"
+      ],
+      "objective": "자동 잠금 중에는 해제 명령이 적용되지 않음을 확인(가정 A-16)",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "vehicle_speed_kph = 10.0, (all, unlock) 명령",
+      "procedure": [
+        "차속 10.0 스냅샷과 (all, unlock) 명령으로 10 ms에 평가"
+      ],
+      "expected": "두 출력 LOCK 유지, reason = AUTO_LOCK",
+      "techniques": [
+        "WoW 검증",
+        "결정 테이블"
+      ],
+      "origin": "제안",
+      "pict_ref": "",
+      "remarks": "OEM 질의 Q-04의 가정(자동 잠금 > 운전자 명령)을 확인하는 케이스"
+    },
+    {
+      "tc_id": "FTC-044",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-023",
+        "SWR-017",
+        "SWR-005"
+      ],
+      "objective": "성인 탑승 해제가 접근위험 잠금보다 우선함을 확인(가정 A-18)",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "adult_present = 1, rear_left_approach_risk = 1",
+      "procedure": [
+        "두 입력을 함께 담은 스냅샷으로 10 ms에 평가"
+      ],
+      "expected": "두 출력 RELEASE, reason = ADULT_PRESENT",
+      "techniques": [
+        "WoW 검증",
+        "결정 테이블"
+      ],
+      "origin": "제안",
+      "pict_ref": "",
+      "remarks": "OEM 질의 Q-21(ASIL B 접근위험 잠금과 QM 해제의 순위)을 확인하는 케이스"
+    },
+    {
+      "tc_id": "FTC-045",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-001",
+        "SWR-023"
+      ],
+      "objective": "전역 규칙이 성립한 평가의 운전자 명령은 버려짐을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "sensor_fault = 1과 (all, unlock) 명령, 다음 평가는 sensor_fault = 0, 명령 없음",
+      "procedure": [
+        "첫 평가에 두 입력을 담아 10 ms에 평가",
+        "다음 평가를 20 ms에 수행"
+      ],
+      "expected": "10 ms: 출력 LOCK 유지, reason = SENSOR_FAULT. 20 ms: 출력 LOCK 유지, reason = NONE",
+      "techniques": [
+        "WoW 검증",
+        "결정 테이블"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
     }
   ],
   "pict_models": [],
@@ -1069,6 +1534,18 @@
       "basis_id": "SWR-013",
       "question": "OEM 질의 Q-01/Q-14: 평가 주기 10 ms(A-01)와 상태 복귀 즉시성(A-08)은 가정",
       "impact": "NTC-001, NTC-002, FTC-006의 시각 기대값이 가정에 의존"
+    },
+    {
+      "id": "Q-03",
+      "basis_id": "SAF-002",
+      "question": "OEM 질의 Q-22: override 때 문을 해제하는지(가정 A-19), ASIL B 접근위험 잠금과 QM 해제 입력의 우선순위(Q-21)",
+      "impact": "FTC-036~038, FTC-044의 기대값이 가정에 의존"
+    },
+    {
+      "id": "Q-04",
+      "basis_id": "SWR-001",
+      "question": "OEM 질의 Q-04, Q-23: 주행 중 운전자 해제 허용 조건과 명령의 일회성(가정 A-16)",
+      "impact": "FTC-043의 기대값이 가정에 의존"
     }
   ],
   "template": null

@@ -1,7 +1,7 @@
 # SW 단위 테스트 명세
 
-- 대상 SW: 전자식 차일드락 제어 SW   버전: 0.1 (이터레이션 1)   일자: 2026-11-27
-- 입력: docs/swe3/detailed-design.md (v0.2)
+- 대상 SW: 전자식 차일드락 제어 SW   버전: 0.2 (이터레이션 1~2)   일자: 2026-11-27
+- 입력: docs/swe3/detailed-design.md (v0.4)
 - 테스트 코드: `tests/unit/` (GoogleTest). TDD 테스트(`tests/tdd/`)와 분리되어 있으며 단위 테스트는 상세 설계의 결정표에서 새로 도출했다.
 - 기준: 테스트 성공률 100%, MC/DC 커버리지 100% (모든 `src/` 파일)
 - 기법: 결정표 기반(MC/DC 벡터), 동치 클래스 분할, 경계값 분석, 스텁(`lock_ctrl`의 하위 컴포넌트만)
@@ -51,6 +51,24 @@
 | UT-051 | FN-024 | lock_ctrl_test: LockCtrlEvaluate.CheckFailureStopsPipeline | 명령 검사 실패 | 결정표 R2, 스텁 | check 실패 | 오류 반환, decide 호출 없음 |
 | UT-052 | FN-024 | lock_ctrl_test: LockCtrlEvaluate.DecideFailureKeepsPreviousOutputs | 결정 실패 | 결정표 R3, R4, 스텁 | decide 실패 | 오류 반환, 직전 출력 불변 |
 | UT-053 | FN-022 | lock_ctrl_test: LockCtrlGetResult.NullArgumentsAreRejected | NULL 거절 | 결정표 R2, R3 | NULL 각각 | STATUS_ERR_PARAM |
+| UT-060 | FN-017, FN-018 | arbiter_test: ArbiterGlobalRules.IgnitionOffReleases | ignition off 규칙 | 결정표 R5 | ignition_on VALID 0/1 | 0: 두 출력 RELEASE, OFF. 1: 유지 |
+| UT-061 | FN-017, FN-018 | arbiter_test: ArbiterGlobalRules.ForcedReleaseInputs | 화재·과온·성인 해제 | 결정표 R6~R8 | 각 입력 TRUE, 동시 | 두 출력 RELEASE, 이유 순서(FIRE 우선) |
+| UT-062 | FN-017 | arbiter_test: ArbiterGlobalRules.PriorityAmongGlobalRules | 전역 규칙 우선순위 | 결정표 조합 | ignition+STALE 등 4조합 | 높은 규칙의 이유 |
+| UT-063 | FN-019 | arbiter_test: ArbiterState.OffIsBelowFaultAndDegraded | state 우선순위 | 결정표 R1~R4 | ignition off + INVALID/sensor_fault | OFF, DEGRADED, FAULT |
+| UT-064 | FN-029, FN-030, FN-031 | arbiter_test: ArbiterDoorRules.ApproachRiskLocksOnlyThatDoor | 접근위험 문별 잠금 | 결정표 R1, 좌우 독립 | 좌/우/양쪽 접근위험 | 해당 문만 LOCK, APPROACH_RISK |
+| UT-065 | FN-030 | arbiter_test: ArbiterDoorRules.IsofixLocksOnlyThatDoor | ISOFIX 문별 잠금 | 결정표 R2 | isofix 좌/우 | 해당 문만 LOCK, ISOFIX |
+| UT-066 | FN-030, FN-034 | arbiter_test: ArbiterDoorRules.AutoLockBoundary | 자동 잠금 경계 | 경계값 분석 | 차속 값 29, 30, 3000 | 29 유지, 30 이상 LOCK |
+| UT-067 | FN-030 | arbiter_test: ArbiterDoorRules.DoorRulePriority | 문 규칙 우선순위 | 결정표 R1~R4 | 접근위험+ISOFIX+주행+명령 조합 | 접근위험 > ISOFIX > 자동 잠금 > 명령 |
+| UT-068 | FN-030, FN-032, FN-033 | arbiter_test: ArbiterDoorRules.DriverCommandMatrix | 명령 적용 조합 | 동치 클래스, MC/DC | (side, action) 6조합, 거절, 없음 | 선택 문·동작에만 적용 |
+| UT-069 | FN-030, FN-031 | arbiter_test: ArbiterApproach.FirstSuppressionIsRecorded | 첫 억제 기록 | 결정표 R3, R4 | 접근위험 문에 unlock | LOCK 유지, pending 기록 |
+| UT-070 | FN-031 | arbiter_test: ArbiterApproach.OverrideWindowBoundary | override 창 경계 | 경계값 분석 | 경과 10,000, 10,001 ms | override / 새 첫 억제 |
+| UT-071 | FN-031 | arbiter_test: ArbiterApproach.OverridePersistsUntilRiskClears | override 유지와 해소 | 상태 전이 | 접근위험 TRUE/FALSE/INVALID | 유지, 지움, 기록 불변 |
+| UT-072 | FN-030, FN-031 | arbiter_test: ArbiterApproach.OverriddenDoorFollowsLowerRules | override 문의 하위 규칙 | 결정표 | override 중 명령, ISOFIX | 명령 RELEASE, ISOFIX LOCK |
+| UT-073 | FN-029, FN-036 | arbiter_test: ArbiterDoorRules.ReasonRankSelection | 이유 순위 선택 | 결정표 | 두 문의 다른 규칙 | 순위 높은 쪽의 이유 |
+| UT-074 | FN-035 | arbiter_test: ArbiterDoorRules.PendingDoesNotOverrideDoorReason | PENDING 이유 보존 | MC/DC | PENDING + ISOFIX | 이유 ISOFIX |
+| UT-080 | FN-020, FN-026 | lock_ctrl_test: LockCtrlApproach.InitClearsApproachState | 초기화의 접근위험 기록 | 결정표 | 채워진 기록 | 모두 지움, override false |
+| UT-081 | FN-024, FN-025 | lock_ctrl_test: LockCtrlApproach.ApproachStateIsCommittedAndPassedOn | 접근위험 기록 확정 | 스텁 | 스텁 결정의 기록 | 결과 override와 다음 평가 입력 |
+| UT-082 | FN-024 | lock_ctrl_test: LockCtrlApproach.FailedDecideDoesNotCommitApproachState | 실패 시 기록 불변 | 스텁, 결정표 R3 | decide 실패 | 기록 확정 안 함 |
 
 ## 2. 스텁
 
@@ -63,3 +81,4 @@
 | 버전 | 일자 | 변경 ID | 사유 | 영향받은 산출물 |
 |---|---|---|---|---|
 | 0.1 | 2026-11-27 | UT-001, UT-002, UT-003, UT-004, UT-005, UT-006, UT-007, UT-008, UT-009, UT-010, UT-011, UT-012, UT-013, UT-014, UT-020, UT-021, UT-022, UT-023, UT-024, UT-025, UT-026, UT-027, UT-028, UT-029, UT-030, UT-040, UT-041, UT-042, UT-043, UT-044, UT-045, UT-046, UT-047, UT-048, UT-049, UT-050, UT-051, UT-052, UT-053 | 이터레이션 1 최초 작성 (단계 리뷰는 사용자 지시로 생략) | 없음 |
+| 0.2 | 2026-11-27 | UT-013, UT-014, UT-020, UT-021, UT-060, UT-061, UT-062, UT-063, UT-064, UT-065, UT-066, UT-067, UT-068, UT-069, UT-070, UT-071, UT-072, UT-073, UT-074, UT-080, UT-081, UT-082 | 이터레이션 2: 검사한 명령 구조체와 arbiter 입력 구조체에 맞춰 UT-013, 014, 020, 021 수정, 문 규칙·전역 규칙·접근위험 시험 추가 | 상세 설계서 |

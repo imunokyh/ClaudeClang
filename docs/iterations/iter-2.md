@@ -25,10 +25,10 @@
 | 1 요구사항 분석 | `docs/swe1/` (v0.6) | 완료 (리뷰 생략) |
 | 2 아키텍처 | `docs/swe2/` (v0.2) | 완료 (리뷰 생략) |
 | 3 상세 설계 | `docs/swe3/` (v0.3) | 완료 (리뷰 생략) |
-| 4 구현 | `src/`, `tests/tdd/` | 진행 중 |
-| 5 단위 테스트 | `tests/unit/`, `docs/swe4/` | 대기 |
-| 6 통합 테스트 | `tests/integration/`, `docs/swe5/` | 대기 |
-| 7 시스템 테스트 | `tests/system/`, `docs/swe6/` | 대기 |
+| 4 구현 | `src/`, `tests/tdd/` | 완료 (구현 게이트 통과, 리뷰 생략) |
+| 5 단위 테스트 | `tests/unit/`, `docs/swe4/` | 완료 (57건, MC/DC 100%, 변이 18/18, 리뷰 생략) |
+| 6 통합 테스트 | `tests/integration/`, `docs/swe5/` | 완료 (20건, 함수 커버리지 100%, 리뷰 생략) |
+| 7 시스템 테스트 | `tests/system/`, `docs/swe6/` | 완료 (TC 52건, 베이시스 커버리지 100%, 리뷰 생략) |
 
 ## 프로세스 편차
 
