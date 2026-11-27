@@ -28,10 +28,12 @@ endfunction()
 cl_add_product_library(cl_input_guard src/input_guard/input_guard.c)
 cl_add_product_library(cl_arbiter src/arbiter/arbiter.c)
 cl_add_product_library(cl_lock_ctrl src/lock_ctrl/lock_ctrl.c)
+cl_add_product_library(cl_status_view src/status_view/status_view.c)
+cl_add_product_library(cl_decision_log src/decision_log/decision_log.c)
 
 # 모든 컴포넌트를 연결한 제품 전체 (통합 테스트, TDD 테스트용)
 add_library(cl_product INTERFACE)
-target_link_libraries(cl_product INTERFACE cl_lock_ctrl cl_input_guard cl_arbiter)
+target_link_libraries(cl_product INTERFACE cl_lock_ctrl cl_input_guard cl_arbiter cl_status_view cl_decision_log)
 
 enable_testing()
 foreach(kind tdd unit integration system)

@@ -2,6 +2,7 @@
 #include "stub_control.h"
 
 #include "arbiter/arbiter_if.h"
+#include "decision_log/decision_log_if.h"
 #include "input_guard/input_guard_if.h"
 
 StubControl g_stub;
@@ -13,6 +14,10 @@ void stub_reset()
     g_stub.update_status = STATUS_OK;
     g_stub.check_status = STATUS_OK;
     g_stub.decide_status = STATUS_OK;
+    g_stub.log_init_status = STATUS_OK;
+    g_stub.log_append_status = STATUS_OK;
+    g_stub.log_count_status = STATUS_OK;
+    g_stub.log_get_status = STATUS_OK;
     for (int i = 0; i < ITEM_COUNT; ++i)
     {
         g_stub.normalized.validity[i] = VALIDITY_VALID;
@@ -72,6 +77,41 @@ status_t arbiter_decide(const arbiter_input_t *input, decision_t *out)
         *out = g_stub.decision;
     }
     return g_stub.decide_status;
+}
+
+status_t decision_log_init(decision_log_t *log)
+{
+    (void)log;
+    return g_stub.log_init_status;
+}
+
+status_t decision_log_append(decision_log_t *log, const decision_entry_t *entry)
+{
+    (void)log;
+    g_stub.log_append_calls++;
+    g_stub.last_appended = *entry;
+    return g_stub.log_append_status;
+}
+
+status_t decision_log_count(const decision_log_t *log, uint32_t *count)
+{
+    (void)log;
+    if (g_stub.log_count_status == STATUS_OK)
+    {
+        *count = g_stub.log_count_value;
+    }
+    return g_stub.log_count_status;
+}
+
+status_t decision_log_get(const decision_log_t *log, uint32_t index, decision_entry_t *out)
+{
+    (void)log;
+    g_stub.last_get_index = index;
+    if (g_stub.log_get_status == STATUS_OK)
+    {
+        *out = g_stub.log_get_entry;
+    }
+    return g_stub.log_get_status;
 }
 
 } // extern "C"

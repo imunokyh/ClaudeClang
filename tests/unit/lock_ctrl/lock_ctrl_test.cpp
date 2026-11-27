@@ -450,3 +450,149 @@ TEST(LockCtrlApproach, FailedDecideDoesNotCommitApproachState)
     EXPECT_FALSE(g_stub.last_approach_in.door[DOOR_LEFT].override_active);
     EXPECT_FALSE(g_stub.last_approach_in.door[DOOR_LEFT].pending);
 }
+
+/**
+ * @test UT-110
+ * @brief 결정이 바뀌지 않은 평가는 이력에 추가하지 않고, 바뀐 평가는 필드와 함께 추가한다
+ *        (FN-049, FN-046 R5).
+ * @par 입력값
+ * 초기 결과와 같은 스텁 결정(출력 RELEASE, NORMAL, NONE), 이후 출력 (LOCK, RELEASE) · FAULT ·
+ * SENSOR_FAULT · 경고 SENSOR_FAULT 결정
+ * @par 절차
+ * 평가 두 번(now 10, 20)
+ * @par 예상 출력값
+ * 첫 평가: 추가 0회. 둘째 평가: 추가 1회, 항목의 now_ms 20, 출력, state, reason, warning이 결정과
+ * 같음
+ */
+TEST(LockCtrlLog, AppendsOnlyOnChange)
+{
+    lock_ctrl_t ctrl = ready_ctrl();
+    lock_ctrl_result_t result = {};
+    ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 10, nullptr, &result));
+    EXPECT_EQ(0, g_stub.log_append_calls);
+    g_stub.decision = {
+        {LOCK_LOCK, LOCK_RELEASE}, STATE_FAULT, REASON_SENSOR_FAULT, WARNING_SENSOR_FAULT, {}};
+    ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 20, nullptr, &result));
+    EXPECT_EQ(1, g_stub.log_append_calls);
+    EXPECT_EQ(20u, g_stub.last_appended.now_ms);
+    EXPECT_EQ(LOCK_LOCK, g_stub.last_appended.outputs.left);
+    EXPECT_EQ(LOCK_RELEASE, g_stub.last_appended.outputs.right);
+    EXPECT_EQ(STATE_FAULT, g_stub.last_appended.state);
+    EXPECT_EQ(REASON_SENSOR_FAULT, g_stub.last_appended.reason);
+    EXPECT_EQ(WARNING_SENSOR_FAULT, g_stub.last_appended.warning);
+    ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 30, nullptr, &result));
+    EXPECT_EQ(1, g_stub.log_append_calls);
+}
+
+/**
+ * @test UT-111
+ * @brief 결정 변화는 출력 좌, 출력 우, state, 이유 중 어느 하나만 달라도 이력에 추가된다 (FN-046
+ * R1~R4).
+ * @par 입력값
+ * 초기 결과 대비 좌 출력만 / 우 출력만 / state만 / 이유만 다른 스텁 결정
+ * @par 절차
+ * 각각 새 제어기로 평가
+ * @par 예상 출력값
+ * 네 경우 모두 이력 추가 1회. 경고만 다른 결정은 추가하지 않는다
+ */
+TEST(LockCtrlLog, EachFieldChangeIsADecision)
+{
+    decision_t decisions[4];
+    for (decision_t &d : decisions)
+    {
+        d = {{LOCK_RELEASE, LOCK_RELEASE}, STATE_NORMAL, REASON_NONE, WARNING_NONE, {}};
+    }
+    decisions[0].outputs.left = LOCK_LOCK;
+    decisions[1].outputs.right = LOCK_LOCK;
+    decisions[2].state = STATE_OFF;
+    decisions[3].reason = REASON_FIRE;
+    for (const decision_t &d : decisions)
+    {
+        lock_ctrl_t ctrl = ready_ctrl();
+        g_stub.decision = d;
+        lock_ctrl_result_t result = {};
+        ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 10, nullptr, &result));
+        EXPECT_EQ(1, g_stub.log_append_calls);
+    }
+    lock_ctrl_t ctrl = ready_ctrl();
+    g_stub.decision.warning = WARNING_SENSOR_FAULT;
+    lock_ctrl_result_t result = {};
+    ASSERT_EQ(STATUS_OK, evaluate(&ctrl, 10, nullptr, &result));
+    EXPECT_EQ(0, g_stub.log_append_calls);
+}
+
+/**
+ * @test UT-112
+ * @brief 이력 추가가 실패하면 그 오류를 반환하고 직전 확정 출력, 시각, 결과를 갱신하지 않는다
+ * (FN-024 R6).
+ * @par 입력값
+ * 결정이 바뀌는 스텁 결정, 스텁 append가 STATUS_ERR_PARAM 반환
+ * @par 절차
+ * 평가 후 결과 조회, 이어서 더 작은 now_ms로 정상 평가
+ * @par 예상 출력값
+ * STATUS_ERR_PARAM, 조회 결과는 초기 결과(state NORMAL). 실패한 시각은 기록되지 않아 더 작은 시각도
+ * 허용
+ */
+TEST(LockCtrlLog, AppendFailureIsNotCommitted)
+{
+    lock_ctrl_t ctrl = ready_ctrl();
+    g_stub.decision = {
+        {LOCK_LOCK, LOCK_LOCK}, STATE_FAULT, REASON_SENSOR_FAULT, WARNING_SENSOR_FAULT, {}};
+    g_stub.log_append_status = STATUS_ERR_PARAM;
+    lock_ctrl_result_t result = {};
+    EXPECT_EQ(STATUS_ERR_PARAM, evaluate(&ctrl, 500, nullptr, &result));
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_result(&ctrl, &result));
+    EXPECT_EQ(STATE_NORMAL, result.state);
+    g_stub.log_append_status = STATUS_OK;
+    EXPECT_EQ(STATUS_OK, evaluate(&ctrl, 100, nullptr, &result));
+}
+
+/**
+ * @test UT-113
+ * @brief 이력 초기화가 실패하면 lock_ctrl_init이 그 오류를 반환한다 (FN-020).
+ * @par 입력값
+ * 스텁 decision_log_init이 STATUS_ERR_PARAM 반환
+ * @par 절차
+ * lock_ctrl_init 호출
+ * @par 예상 출력값
+ * STATUS_ERR_PARAM
+ */
+TEST(LockCtrlLog, LogInitFailureIsPropagated)
+{
+    stub_reset();
+    g_stub.log_init_status = STATUS_ERR_PARAM;
+    lock_ctrl_t ctrl = {};
+    EXPECT_EQ(STATUS_ERR_PARAM, lock_ctrl_init(&ctrl, nullptr));
+}
+
+/**
+ * @test UT-114
+ * @brief 이력 조회 함수는 ctrl이 NULL이면 거절하고, 아니면 이력 컴포넌트의 결과를 그대로 낸다
+ *        (FN-047, FN-048).
+ * @par 입력값
+ * ctrl NULL / 스텁 이력 건수 7, 항목 이벤트 ID 42 / 스텁 오류
+ * @par 절차
+ * lock_ctrl_get_log_count, lock_ctrl_get_log_entry 호출
+ * @par 예상 출력값
+ * NULL: STATUS_ERR_PARAM. 정상: 건수 7, 항목 event_id 42, 스텁이 받은 index 3. 오류: 스텁의 오류
+ * 코드
+ */
+TEST(LockCtrlLog, QueryPassThrough)
+{
+    lock_ctrl_t ctrl = ready_ctrl();
+    uint32_t count = 0;
+    decision_entry_t entry = {};
+    EXPECT_EQ(STATUS_ERR_PARAM, lock_ctrl_get_log_count(nullptr, &count));
+    EXPECT_EQ(STATUS_ERR_PARAM, lock_ctrl_get_log_entry(nullptr, 0, &entry));
+    g_stub.log_count_value = 7;
+    g_stub.log_get_entry.event_id = 42;
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_count(&ctrl, &count));
+    EXPECT_EQ(7u, count);
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_entry(&ctrl, 3, &entry));
+    EXPECT_EQ(42u, entry.event_id);
+    EXPECT_EQ(3u, g_stub.last_get_index);
+    g_stub.log_count_status = STATUS_ERR_PARAM;
+    g_stub.log_get_status = STATUS_ERR_PARAM;
+    EXPECT_EQ(STATUS_ERR_PARAM, lock_ctrl_get_log_count(&ctrl, &count));
+    EXPECT_EQ(STATUS_ERR_PARAM, lock_ctrl_get_log_entry(&ctrl, 3, &entry));
+}
