@@ -346,6 +346,54 @@
       "text": "접근위험이 VALID로 TRUE인 문을 LOCK하고 해제 요청을 억제하며 원인(APPROACH_RISK)을 기록한다. override가 성립한 문은 예외(질의 Q-22).",
       "asil": "ASIL B",
       "technique_notes": "경계값 분석: boolean 입력이라 경계가 없고 동치 클래스(TRUE, FALSE)로 덮는다."
+    },
+    {
+      "id": "SWR-004",
+      "title": "일반 해제 허용 조건",
+      "type": "기능",
+      "text": "운전자 해제 명령은 전역 규칙과 접근위험·ISOFIX·자동 잠금 규칙이 없을 때만 적용된다.",
+      "asil": "QM",
+      "technique_notes": "경계값 분석: 조건 조합 표(결정 테이블)로 덮고 수치 경계는 자동 잠금(SWR-003)이 검증한다."
+    },
+    {
+      "id": "SWR-014",
+      "title": "상태 조회",
+      "type": "기능",
+      "text": "상태 조회는 출력, state, 입력 상태, 이유, 경고, 명령 상태, override 상태를 제공한다.",
+      "asil": "QM",
+      "technique_notes": "동치 클래스, 경계값 분석: 출력 필드 확인 요구라 입력 분할·경계가 없다."
+    },
+    {
+      "id": "SWR-015",
+      "title": "상태 직렬화",
+      "type": "기능",
+      "text": "조회 결과를 JSON 문자열로 직렬화하고 버퍼 부족이면 STATUS_ERR_BUFFER와 빈 문자열, NULL·크기 0이면 STATUS_ERR_PARAM.",
+      "asil": "QM",
+      "technique_notes": ""
+    },
+    {
+      "id": "SWR-010",
+      "title": "제어 결정 이력",
+      "type": "기능",
+      "text": "결정이 바뀔 때마다 이력에 1건 추가, 이벤트 ID 1부터 증가, 최근 100건만 보존, 오래된 것부터 조회.",
+      "asil": "QM",
+      "technique_notes": ""
+    },
+    {
+      "id": "SWR-011",
+      "title": "이력 항목 스키마",
+      "type": "기능",
+      "text": "이력 항목은 event_id, now_ms, lock_left, lock_right, state, reason_code, warning_code만 가진다.",
+      "asil": "QM",
+      "technique_notes": "동치 클래스, 경계값 분석: 구조 요구라 입력 분할·경계가 없고 필드 값 일치로 검증한다."
+    },
+    {
+      "id": "SWR-012",
+      "title": "이력의 휘발성",
+      "type": "기능",
+      "text": "이력은 메모리에만 두고 초기화하면 비우며 파일 입출력을 하지 않는다.",
+      "asil": "QM",
+      "technique_notes": "동치 클래스, 경계값 분석: 초기화 동작과 정적 검사로 검증하는 요구라 입력 분할·경계가 없다."
     }
   ],
   "test_cases": [
@@ -1519,6 +1567,206 @@
       "origin": "기본",
       "pict_ref": "",
       "remarks": ""
+    },
+    {
+      "tc_id": "FTC-046",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-004",
+        "SWR-001"
+      ],
+      "objective": "일반 해제는 접근위험·ISOFIX·자동 잠금·전역 규칙이 없을 때만 적용됨을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "(all, unlock) 명령 + 조건 (a) 좌 접근위험 TRUE, (b) isofix_right TRUE, (c) 차속 10 km/h, (d) sensor_fault TRUE, (e) 조건 없음",
+      "procedure": [
+        "조건마다 새로 초기화하고 해당 입력과 명령을 담아 10 ms에 평가"
+      ],
+      "expected": "(a) LOCK, RELEASE. (b) RELEASE, LOCK. (c) LOCK, LOCK. (d) LOCK, LOCK. (e) RELEASE, RELEASE (lock_left, lock_right 순)",
+      "techniques": [
+        "결정 테이블",
+        "WoW 검증"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-047",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-014"
+      ],
+      "objective": "상태 조회가 직전 평가의 출력·상태·이유·입력 상태·override를 담음을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "좌 접근위험 TRUE 스냅샷, 이후 (left, unlock) 명령",
+      "procedure": [
+        "접근위험 스냅샷으로 10 ms에 평가",
+        "lock_ctrl_get_result로 조회",
+        "(left, unlock) 명령을 20 ms에 평가해 다시 조회"
+      ],
+      "expected": "조회 값이 각 평가의 결과와 같다: lock_left = LOCK, reason = priority_reason = APPROACH_RISK, input_validity 모두 VALID, override_left = FALSE. 초기화 직후에도 조회 가능",
+      "techniques": [
+        "동치 클래스",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-048",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-015"
+      ],
+      "objective": "초기 결과의 직렬화 문자열이 정해진 형식임을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "초기화 직후 조회 결과, 크기 1024 버퍼",
+      "procedure": [
+        "lock_ctrl_get_result 후 status_view_format 호출"
+      ],
+      "expected": "STATUS_OK와 요구사항 5.6절의 문자열(lock_left RELEASE, lock_right RELEASE, state NORMAL, 이유·경고·명령 NONE, override false, 입력 상태 모두 STALE)",
+      "techniques": [
+        "요구사항 기반 테스트",
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-049",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-015"
+      ],
+      "objective": "직렬화 버퍼 크기 경계: 필요 길이(널 포함)에서 성공, 1 작으면 STATUS_ERR_BUFFER와 빈 문자열",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "버퍼 크기 = 필요 길이, 필요 길이 - 1",
+      "procedure": [
+        "필요 길이를 구해 두 크기로 호출"
+      ],
+      "expected": "필요 길이: STATUS_OK. 필요 길이 - 1: STATUS_ERR_BUFFER, buffer[0] = 널 문자",
+      "techniques": [
+        "경계값 분석",
+        "결함 주입"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-050",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-015"
+      ],
+      "objective": "직렬화 인자 오류(NULL 결과, NULL 버퍼, 크기 0)는 STATUS_ERR_PARAM",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 RELEASE(설정 없음), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "result NULL, buffer NULL, size 0",
+      "procedure": [
+        "각각 호출"
+      ],
+      "expected": "STATUS_ERR_PARAM",
+      "techniques": [
+        "동치 클래스",
+        "오류 추측"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-051",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-010",
+        "SWR-011"
+      ],
+      "objective": "결정이 바뀔 때만 이력에 남고 항목의 필드가 평가 결과와 같음을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "정상 평가, sensor_fault TRUE, 같은 상태 반복, sensor_fault FALSE",
+      "procedure": [
+        "10 ms 정상 평가",
+        "20 ms sensor_fault TRUE",
+        "30 ms 같은 입력",
+        "40 ms sensor_fault FALSE",
+        "이력 건수와 항목 조회"
+      ],
+      "expected": "이력 2건: (event_id 1, now_ms 20, state FAULT, reason SENSOR_FAULT, warning SENSOR_FAULT, 출력 LOCK, LOCK), (event_id 2, now_ms 40, state NORMAL, reason NONE, warning NONE). 30 ms는 이력에 없다",
+      "techniques": [
+        "요구사항 기반 테스트",
+        "동치 클래스"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-052",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-010"
+      ],
+      "objective": "이력 보존 경계: 100건까지 모두, 101건부터 가장 오래된 것을 덮어씀",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "결정이 바뀌는 평가를 100번, 101번",
+      "procedure": [
+        "sensor_fault를 매 평가마다 바꿔 100번 평가 후 조회",
+        "새 제어기로 101번 평가 후 조회"
+      ],
+      "expected": "100번: 건수 100, event_id 1~100. 101번: 건수 100, 첫 항목 event_id 2, 마지막 101, index 100은 STATUS_ERR_PARAM",
+      "techniques": [
+        "경계값 분석",
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "FTC-053",
+      "sheet": "기능",
+      "basis_ids": [
+        "SWR-012"
+      ],
+      "objective": "초기화(재기동)하면 이력이 비워지고 이벤트 ID가 1부터 다시 시작함을 확인",
+      "preconditions": "PC/SIL(Docker 컨테이너 claudeclangbuild), 시험 하네스가 lock_ctrl_evaluate를 10 ms 주기로 호출. 초기 출력 LOCK(시험 지원 초기화), 모든 입력 항목 유효한 값(차속 0, 기어 P, 충돌 NONE, ignition_on 1, 나머지 0)으로 스냅샷 송신",
+      "inputs": "이력을 채운 제어기를 다시 초기화",
+      "procedure": [
+        "결정을 3번 바꿔 이력 3건을 만든다",
+        "lock_ctrl_init으로 다시 초기화",
+        "건수 조회, 결정을 한 번 바꿔 항목 조회"
+      ],
+      "expected": "초기화 후 건수 0, 새 항목의 event_id 1",
+      "techniques": [
+        "요구사항 기반 테스트",
+        "WoW 검증"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
+    },
+    {
+      "tc_id": "NTC-008",
+      "sheet": "비기능",
+      "basis_ids": [
+        "SWR-012"
+      ],
+      "objective": "제품 코드가 파일·저장소 입출력 함수를 호출하지 않음을 확인",
+      "preconditions": "Docker 컨테이너 claudeclangbuild",
+      "inputs": "소스 src/",
+      "procedure": [
+        "tools/run.sh rules 실행",
+        "금지 호출 검사 B4 결과 확인"
+      ],
+      "expected": "B4 위반 0건, 판정: 통과",
+      "techniques": [
+        "요구사항 기반 테스트"
+      ],
+      "origin": "기본",
+      "pict_ref": "",
+      "remarks": ""
     }
   ],
   "pict_models": [],
@@ -1546,6 +1794,18 @@
       "basis_id": "SWR-001",
       "question": "OEM 질의 Q-04, Q-23: 주행 중 운전자 해제 허용 조건과 명령의 일회성(가정 A-16)",
       "impact": "FTC-043의 기대값이 가정에 의존"
+    },
+    {
+      "id": "Q-05",
+      "basis_id": "SWR-010",
+      "question": "OEM 질의 Q-24: 제어 결정 한 건의 정의(가정 A-22: 출력·state·이유가 바뀐 평가)",
+      "impact": "FTC-051~053의 기대값이 가정에 의존"
+    },
+    {
+      "id": "Q-06",
+      "basis_id": "SWR-015",
+      "question": "OEM 질의 Q-25: 표시 인터페이스의 형식(Web 제외, JSON 문자열은 가정 A-23)",
+      "impact": "FTC-048~050의 기대 문자열이 가정에 의존"
     }
   ],
   "template": null

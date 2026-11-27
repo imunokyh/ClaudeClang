@@ -28,7 +28,8 @@ typedef enum
 {
     STATUS_OK = 0,        /**< 정상 실행 */
     STATUS_ERR_PARAM = 1, /**< 매개변수 오류 (NULL, 열거 범위 밖) */
-    STATUS_ERR_TIME = 2   /**< 평가 시각이 직전에 받아들여진 평가보다 작음 */
+    STATUS_ERR_TIME = 2,  /**< 평가 시각이 직전에 받아들여진 평가보다 작음 */
+    STATUS_ERR_BUFFER = 3 /**< 호출자가 준 버퍼가 부족함 */
 } status_t;
 
 /** 잠금 출력 값 (OEM-IF-005). */
@@ -245,6 +246,17 @@ typedef struct
     validity_t input_validity[ITEM_COUNT]; /**< 입력 항목별 입력 상태 */
     bool override_active[DOOR_COUNT];      /**< 문별 override 성립 여부 */
 } lock_ctrl_result_t;
+
+/** 제어 결정 이력 항목 (SWR-011). 영상, 음성, 개인 식별자는 담지 않는다. */
+typedef struct
+{
+    uint32_t event_id;      /**< 이벤트 ID (1부터 1씩 증가) */
+    uint32_t now_ms;        /**< 결정이 난 평가 시각 (ms) */
+    lock_outputs_t outputs; /**< 확정한 출력 */
+    ctrl_state_t state;     /**< 제어 상태 */
+    reason_t reason;        /**< 결정 이유 (reason_code) */
+    warning_t warning;      /**< 경고 코드 */
+} decision_entry_t;
 
 #ifdef __cplusplus
 }

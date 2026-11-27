@@ -5,8 +5,10 @@
 
 #include <chrono>
 #include <limits>
+#include <string>
 
 #include "lock_ctrl/lock_ctrl_if.h"
+#include "status_view/status_view_if.h"
 
 namespace
 {
@@ -682,5 +684,194 @@ TEST(IntegrationDoorRules, SourceDoesNotMatter)
         EXPECT_EQ(LOCK_LOCK, h.result().outputs.right);
         EXPECT_EQ(REASON_DRIVER_COMMAND, h.result().reason);
         EXPECT_EQ(COMMAND_ACCEPTED, h.result().command_status);
+    }
+}
+
+namespace
+{
+
+/** 조회 결과를 직렬화한 문자열. */
+std::string serialize(Harness &h)
+{
+    lock_ctrl_result_t result = {};
+    EXPECT_EQ(STATUS_OK, lock_ctrl_get_result(h.ctrl(), &result));
+    char buffer[2048] = {};
+    EXPECT_EQ(STATUS_OK, status_view_format(&result, buffer, sizeof(buffer)));
+    return std::string(buffer);
+}
+
+} // namespace
+
+/**
+ * @test IT-021
+ * @brief 평가 결과를 조회해 직렬화하면 그 평가의 출력, 이유, 입력 상태, override가 문자열에 그대로
+ * 나온다 (SWR-014, 015; IF-003, IF-005).
+ * @par 입력값
+ * 초기 RELEASE, 좌 접근위험 TRUE에서 좌 unlock 두 번(10,000 ms 이내), 이후 STALE
+ * @par 절차
+ * 각 단계 뒤 lock_ctrl_get_result와 status_view_format 호출
+ * @par 예상 출력값
+ * 접근위험: "lock_left":"LOCK", "reason_code":"APPROACH_RISK". override 성립: "override_left":true,
+ * "lock_left":"RELEASE", "APPROACH_OVERRIDE". STALE 후: "state":"DEGRADED", "INPUT_STALE", 입력
+ * 상태 "STALE"
+ */
+TEST(IntegrationStatusView, ReflectsEvaluationResult)
+{
+    Harness h(LOCK_RELEASE);
+    h.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, h.step(10));
+    std::string text = serialize(h);
+    EXPECT_NE(std::string::npos, text.find("\"lock_left\":\"LOCK\""));
+    EXPECT_NE(std::string::npos, text.find("\"reason_code\":\"APPROACH_RISK\""));
+    ASSERT_EQ(STATUS_OK, h.step(20, true, &kUnlockLeftCmd));
+    for (uint32_t now = 30; now <= 10000; now += 10)
+    {
+        ASSERT_EQ(STATUS_OK, h.step(now));
+    }
+    ASSERT_EQ(STATUS_OK, h.step(10010, true, &kUnlockLeftCmd));
+    text = serialize(h);
+    EXPECT_NE(std::string::npos, text.find("\"override_left\":true"));
+    EXPECT_NE(std::string::npos, text.find("\"lock_left\":\"RELEASE\""));
+    EXPECT_NE(std::string::npos, text.find("\"reason_code\":\"APPROACH_OVERRIDE\""));
+    ASSERT_EQ(STATUS_OK, h.step(10300, false));
+    ASSERT_EQ(STATUS_OK, h.step(10310, false));
+    text = serialize(h);
+    EXPECT_NE(std::string::npos, text.find("\"state\":\"DEGRADED\""));
+    EXPECT_NE(std::string::npos, text.find("\"reason_code\":\"INPUT_STALE\""));
+    EXPECT_NE(std::string::npos, text.find("\"vehicle_speed\":\"STALE\""));
+}
+
+/**
+ * @test IT-022
+ * @brief 직렬화 버퍼가 부족하면 STATUS_ERR_BUFFER와 빈 문자열이다 (SWR-015; IF-005).
+ * @par 입력값
+ * 초기 결과, 버퍼 크기 10
+ * @par 절차
+ * status_view_format 호출
+ * @par 예상 출력값
+ * STATUS_ERR_BUFFER, 빈 문자열
+ */
+TEST(IntegrationStatusView, SmallBufferFails)
+{
+    Harness h(LOCK_LOCK);
+    lock_ctrl_result_t result = {};
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_result(h.ctrl(), &result));
+    char buffer[10] = {'x'};
+    EXPECT_EQ(STATUS_ERR_BUFFER, status_view_format(&result, buffer, sizeof(buffer)));
+    EXPECT_EQ('\0', buffer[0]);
+}
+
+/**
+ * @test IT-023
+ * @brief 결정이 바뀔 때만 이력에 남고 이벤트 ID, 시각, 이유가 평가 결과와 일치한다
+ *        (SWR-010, 011; IF-003, IF-006).
+ * @par 입력값
+ * 초기 LOCK, 정상 → sensor_fault TRUE → 같은 상태 반복 → 충돌 CONFIRMED → 정상(충돌 해제 유지)
+ * @par 절차
+ * 평가하며 이력 건수와 항목 조회
+ * @par 예상 출력값
+ * 이력: (ID 1, 시각 20, FAULT, SENSOR_FAULT), (ID 2, 시각 40, RELEASE, CRASH_CONFIRMED), (ID 3,
+ * 시각 50, NORMAL, NONE). 반복 평가(30)는 이력에 없음
+ */
+TEST(IntegrationDecisionLog, RecordsDecisionChanges)
+{
+    Harness h(LOCK_LOCK);
+    ASSERT_EQ(STATUS_OK, h.step(10));
+    h.set(ITEM_SENSOR_FAULT, 1.0);
+    ASSERT_EQ(STATUS_OK, h.step(20));
+    ASSERT_EQ(STATUS_OK, h.step(30));
+    h.set(ITEM_CRASH_STATUS, CRASH_CONFIRMED);
+    ASSERT_EQ(STATUS_OK, h.step(40));
+    h.set(ITEM_SENSOR_FAULT, 0.0);
+    h.set(ITEM_CRASH_STATUS, CRASH_NONE);
+    ASSERT_EQ(STATUS_OK, h.step(50));
+    uint32_t count = 0;
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_count(h.ctrl(), &count));
+    ASSERT_EQ(3u, count);
+    decision_entry_t entry = {};
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_entry(h.ctrl(), 0, &entry));
+    EXPECT_EQ(1u, entry.event_id);
+    EXPECT_EQ(20u, entry.now_ms);
+    EXPECT_EQ(STATE_FAULT, entry.state);
+    EXPECT_EQ(REASON_SENSOR_FAULT, entry.reason);
+    EXPECT_EQ(WARNING_SENSOR_FAULT, entry.warning);
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_entry(h.ctrl(), 1, &entry));
+    EXPECT_EQ(2u, entry.event_id);
+    EXPECT_EQ(40u, entry.now_ms);
+    EXPECT_EQ(LOCK_RELEASE, entry.outputs.left);
+    EXPECT_EQ(REASON_CRASH_CONFIRMED, entry.reason);
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_entry(h.ctrl(), 2, &entry));
+    EXPECT_EQ(3u, entry.event_id);
+    EXPECT_EQ(50u, entry.now_ms);
+    EXPECT_EQ(STATE_NORMAL, entry.state);
+    EXPECT_EQ(REASON_NONE, entry.reason);
+}
+
+/**
+ * @test IT-024
+ * @brief 결정이 101번 바뀌면 최신 100건만 오래된 순서로 남고, 초기화(재기동)하면 비워진다
+ *        (SWR-010, 012; IF-003, IF-006).
+ * @par 입력값
+ * sensor_fault를 매 평가마다 바꿔 101번 결정 변화, 이후 lock_ctrl_init
+ * @par 절차
+ * 평가 후 첫·마지막 항목 조회, 범위 밖 index 조회, 초기화 후 건수와 새 ID
+ * @par 예상 출력값
+ * 건수 100, 첫 ID 2, 마지막 ID 101, index 100은 STATUS_ERR_PARAM. 초기화 후 건수 0, 새 항목은 ID 1
+ */
+TEST(IntegrationDecisionLog, KeepsLatestHundredAndResets)
+{
+    Harness h(LOCK_LOCK);
+    for (uint32_t i = 0; i < 101; ++i)
+    {
+        h.set(ITEM_SENSOR_FAULT, (i % 2 == 0) ? 1.0 : 0.0);
+        ASSERT_EQ(STATUS_OK, h.step(10 * (i + 1)));
+    }
+    uint32_t count = 0;
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_count(h.ctrl(), &count));
+    EXPECT_EQ(100u, count);
+    decision_entry_t entry = {};
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_entry(h.ctrl(), 0, &entry));
+    EXPECT_EQ(2u, entry.event_id);
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_entry(h.ctrl(), 99, &entry));
+    EXPECT_EQ(101u, entry.event_id);
+    EXPECT_EQ(STATUS_ERR_PARAM, lock_ctrl_get_log_entry(h.ctrl(), 100, &entry));
+    ASSERT_EQ(STATUS_OK, lock_ctrl_init(h.ctrl(), nullptr));
+    ASSERT_EQ(STATUS_OK, lock_ctrl_get_log_count(h.ctrl(), &count));
+    EXPECT_EQ(0u, count);
+}
+
+/**
+ * @test IT-025
+ * @brief 일반 해제 허용 조건: 접근위험·ISOFIX·자동 잠금·전역 규칙이 없을 때만 해제가 적용된다
+ *        (SWR-004, 001; IF-001, IF-002).
+ * @par 입력값
+ * 초기 LOCK, (all, unlock) 명령 + (좌 접근위험 / 우 ISOFIX / 차속 10 km/h / sensor_fault / 조건
+ * 없음)
+ * @par 절차
+ * 조건마다 새 제어기로 평가
+ * @par 예상 출력값
+ * (LOCK, RELEASE), (RELEASE, LOCK), (LOCK, LOCK), (LOCK, LOCK), (RELEASE, RELEASE)
+ */
+TEST(IntegrationDoorRules, GeneralReleaseAllowedOnlyWithoutBlockers)
+{
+    struct Case
+    {
+        input_item_t item;
+        double value;
+        lock_cmd_t left;
+        lock_cmd_t right;
+    };
+    const Case cases[] = {{ITEM_REAR_LEFT_APPROACH_RISK, 1.0, LOCK_LOCK, LOCK_RELEASE},
+                          {ITEM_ISOFIX_RIGHT, 1.0, LOCK_RELEASE, LOCK_LOCK},
+                          {ITEM_VEHICLE_SPEED, 10.0, LOCK_LOCK, LOCK_LOCK},
+                          {ITEM_SENSOR_FAULT, 1.0, LOCK_LOCK, LOCK_LOCK},
+                          {ITEM_GEAR, 0.0, LOCK_RELEASE, LOCK_RELEASE}};
+    for (const Case &c : cases)
+    {
+        Harness h(LOCK_LOCK);
+        h.set(c.item, c.value);
+        ASSERT_EQ(STATUS_OK, h.step(10, true, &kUnlockAllCmd));
+        EXPECT_EQ(c.left, h.result().outputs.left);
+        EXPECT_EQ(c.right, h.result().outputs.right);
     }
 }

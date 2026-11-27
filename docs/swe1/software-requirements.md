@@ -1,6 +1,6 @@
 # SW 요구사항 명세
 
-- 대상 SW: 전자식 차일드락 제어 SW (후석 좌, 우)   버전: 0.6 (이터레이션 1~2)   일자: 2026-11-27
+- 대상 SW: 전자식 차일드락 제어 SW (후석 좌, 우)   버전: 0.7 (이터레이션 1~3)   일자: 2026-11-27
 - 입력 문서: OEM-SWR-001 OEM SW 요구사항 사양서, Rev 1.0, 베이스라인 BL-OEM-1.0 (`OEM/OEM-SWR-001_OEM SW 요구사항 사양서.docx`)
 - ISO 25010 적용 판: 2023
 - 안전 요구사항: [safety-requirements.md](safety-requirements.md)
@@ -22,8 +22,10 @@
 | OEM-IF-005 | 포함: 출력 lock_left, lock_right의 값 정의(SWR-007). 적용 feedback은 OEM이 범위 밖으로 정함 |
 | OEM-IF-006 | 이터레이션 3 (OEM-FR-004). 이터레이션 1은 state, priority_reason, reason_code, input_validity 값을 만들어 두기만 하고 표시 형식·직렬화는 다루지 않는다 |
 | OEM-SR-002, OEM-FR-002, FR-003, FR-005, FR-006, FR-007 | 이터레이션 2: 접근위험 잠금과 억제·override(SWR-005, 006, 009, 048), 자동 잠금(SWR-003), 화재·과온·성인 해제(SWR-017), ISOFIX 잠금(SWR-018), ignition off(SWR-020) |
-| OEM-FR-001 (명령 적용) | 이터레이션 2: 운전자 명령의 적용(SWR-001, 002). 접근위험 억제·override의 전제이므로 이터레이션 3에서 앞당겼다. 일반 해제 허용 조건(SWR-004)은 이터레이션 3 |
-| OEM-FR-004, NFR-001, NFR-002 | 이터레이션 3~4. 다만 초기 상태(SWR-025), OEM-NFR-001 중 시계 입력(SWR-032)과 난수 금지(SWR-047)는 이터레이션 1이 선행했다 |
+| OEM-FR-001 | 이터레이션 2: 운전자 명령의 적용(SWR-001, 002). 이터레이션 3: 일반 해제 허용 조건(SWR-004) |
+| OEM-FR-004 | 이터레이션 3: 상태 조회와 표시용 직렬화(SWR-014, 015) |
+| OEM-NFR-002 | 이터레이션 3: 제어 결정 이력(SWR-010, 011, 012) |
+| OEM-NFR-001 | 이터레이션 4. 다만 초기 상태(SWR-025), OEM-NFR-001 중 시계 입력(SWR-032)과 난수 금지(SWR-047)는 이터레이션 1이 선행했다 |
 
 ### 0.2 용어
 
@@ -75,6 +77,12 @@
 | SWR-003 | 기능 | SW는 전역 규칙 1~8이 성립하지 않고 문에 규칙 9, 10이 적용되지 않을 때, vehicle_speed_kph의 입력 상태가 VALID이고 판정 값이 3.0 km/h(30) 이상이면 그 문의 출력을 LOCK으로 확정하고 결정 이유를 AUTO_LOCK으로 한다(SWR-023 규칙 11). | 입력 vehicle_speed_kph(0.1 km/h 단위 정수) / 출력 lock_left, lock_right, reason_code | 초기 RELEASE에서 차속 2.9 km/h(29) 평가는 RELEASE 유지, 3.0 km/h(30)인 첫 평가에 두 출력 LOCK이고 reason=AUTO_LOCK. 차속이 다시 내려가도 출력은 LOCK 유지 | OEM-FR-002 | |
 | SWR-001 | 기능 | SW는 전역 규칙 1~8이 성립하지 않을 때, 그 평가에서 받은 유효한 운전자 명령(command_status=ACCEPTED)을 문 규칙 12로 적용한다: action이 lock이면 대상 문(side가 left, right이면 그 문, all이면 두 문)을 LOCK으로, unlock이면 RELEASE로 확정하고 결정 이유를 DRIVER_COMMAND로 한다. 문 규칙 9, 10, 11이 적용되는 문에는 적용하지 않는다. 명령은 그 평가에서만 처리하는 일회성 사건이며 다음 평가로 이어지지 않는다. | 입력 운전자 명령(side, action, source) / 출력 lock_left, lock_right, reason_code | 접근위험·ISOFIX 없음, 차속 0, 초기 LOCK에서 (all, unlock)을 평가하면 두 출력 RELEASE, reason=DRIVER_COMMAND. (left, lock)이면 lock_left만 LOCK. 전역 규칙이 성립하는 평가(예: sensor_fault TRUE)의 명령은 적용되지 않는다 | OEM-FR-001, 가정 A-16 | |
 | SWR-002 | 기능 | SW는 운전자 명령의 source(physical_button, avn, voice, mobile_app)에 따라 처리 결과를 다르게 하지 않는다. 등록된 네 값은 모두 같은 방식으로 SWR-001을 적용한다. | 입력 source / 출력 lock_left, lock_right | 같은 (side, action)에 대해 source 네 값 각각의 평가 결과(출력, 결정 이유)가 서로 같다 | OEM-FR-001 | |
+| SWR-004 | 기능 | SW는 일반 해제(운전자 명령 unlock)를 전역 규칙 1~8이 성립하지 않고 그 문에 접근위험 규칙(override 아님), ISOFIX 규칙, 자동 잠금 규칙이 적용되지 않을 때에만 허용한다. 허용되지 않는 해제 요청은 출력을 바꾸지 않는다. | 운전자 명령(unlock), 입력 전체 / 출력 lock_left, lock_right | 초기 LOCK에서 (all, unlock)을 평가: 접근위험(좌) TRUE이면 좌 LOCK 유지·우 RELEASE, isofix_right TRUE이면 우 LOCK 유지, 차속 3.0 km/h 이상이면 두 문 LOCK 유지, sensor_fault TRUE이면 두 문 LOCK 유지. 위 조건이 모두 없으면 두 문 RELEASE | OEM-FR-001, 가정 A-16, 질의 Q-04 | |
+| SWR-014 | 기능 | SW는 상태 조회(lock_ctrl_get_result)에 lock_left, lock_right, state, 입력 항목별 input_validity, priority_reason, reason_code, warning_code, command_status, 문별 override 상태를 포함해 제공한다. | 출력 5.3절 전체 | 평가 후 조회한 결과의 각 필드가 그 평가의 출력과 같다. 초기화 직후에도 조회할 수 있다(SWR-025) | OEM-FR-004, OEM-IF-006 | |
+| SWR-015 | 기능 | SW는 조회 결과를 5.6절 형식의 문자열(JSON)로 직렬화해 호출자가 준 버퍼에 쓴다. 문자열은 널 종료되며 버퍼가 부족하면 STATUS_ERR_BUFFER를 반환하고 버퍼를 빈 문자열로 만든다. 버퍼가 없거나 크기가 0이면 STATUS_ERR_PARAM을 반환한다. | 입력 조회 결과, 버퍼, 크기 / 출력 문자열, 반환 상태 | 초기 결과를 직렬화하면 5.6절의 예와 같은 문자열. 필요 길이보다 1 작은 버퍼는 STATUS_ERR_BUFFER와 빈 문자열, 필요 길이와 같은 크기(널 포함)는 STATUS_OK. NULL 결과·NULL 버퍼·크기 0은 STATUS_ERR_PARAM | OEM-FR-004, OEM-IF-006(직렬화 실패는 오류), 가정 A-23 | |
+| SWR-010 | 기능 | SW는 제어 결정(평가 결과의 lock_left, lock_right, state, reason_code 중 하나가 직전 결과와 달라진 것)이 생길 때마다 이력에 1건을 추가하고 이력 항목에 1부터 1씩 증가하는 이벤트 ID를 부여한다. 이력은 최근 100건만 보존하며 101번째 항목부터 가장 오래된 항목을 덮어쓴다. 이력은 오래된 항목부터 순서대로 조회한다. 직전 결과는 초기화 직후에는 초기 결과(SWR-025)다. | 평가 결과 / 이력 항목 | 결정이 바뀌는 평가를 101번 만들면 이력 100건이 이벤트 ID 2~101 순서로 조회되고 이벤트 ID 1은 조회되지 않는다. 같은 결과가 반복되는 평가는 항목을 추가하지 않는다 | OEM-NFR-002, 가정 A-22 | |
+| SWR-011 | 기능 | SW는 이력 항목을 event_id, now_ms, lock_left, lock_right, state, reason_code, warning_code 필드로만 구성한다. | 이력 항목 | 이력 항목의 모든 필드 값이 해당 결정의 평가 결과와 같고 위 필드 외의 필드가 없다(구조체 정의와 시험) | OEM-NFR-002 | |
+| SWR-012 | 기능 | SW는 이력을 메모리에만 두며 제어기를 초기화하면 비운다. 이력에는 영상, 음성, 개인 식별자를 저장하지 않고 제품 코드는 파일·저장소 입출력 함수를 호출하지 않는다. | 초기화 / 이력 | 이력을 채운 뒤 lock_ctrl_init을 하면 이력 0건이고 이벤트 ID가 다시 1부터 시작한다. `tools/run.sh rules`의 B4 검사 위반 0건 | OEM-NFR-002 | |
 
 ## 2. 비기능 요구사항
 
@@ -141,6 +149,8 @@
 | Q-21 | 우선순위(이터레이션 2) | 화재·과온·성인 해제(QM)와 접근위험 잠금(ASIL B)이 동시일 때, ISOFIX 잠금과 화재 해제가 동시일 때, ignition off와 충돌 동시일 때의 순위가 OEM 문서에 없다 | 열림 | 가정 A-03, A-17, A-18 적용(해제 계열이 우선) |
 | Q-22 | override와 안전 요구의 관계 | OEM-SR-002(ASIL B, 접근위험 문은 LOCK을 유지)와 OEM-FR-003(QM, 재입력은 명시적 override)이 충돌한다. override 때 문을 해제하는지, 상태·이유만 기록하는지 문서에 없다 | 열림 | 가정 A-19: 해제한다(문 규칙 12) |
 | Q-23 | 명령 지속 | 운전자 명령이 일회성 사건인지, 입력이 유지되는 동안 유효한지 정의가 없다 | 열림 | 가정 A-16: 일회성 |
+| Q-24 | 제어 결정의 정의 | OEM-NFR-002의 "최근 제어결정 100건"에서 무엇이 한 건인지 정의가 없다 | 열림 | 가정 A-22 적용 |
+| Q-25 | 표시 인터페이스 형식 | OEM-IF-006은 직렬화 실패를 HTTP 500으로 처리하는 Web 표시를 전제하지만 이 프로젝트는 Web을 제외했다. 문자열 표현의 형식이 정해져 있지 않다 | 열림 | 가정 A-23 적용(Web 제외, 문자열로 직렬화) |
 
 ## 4. 가정
 
@@ -167,6 +177,8 @@
 | A-19 | override | override가 성립하면 그 문의 해제 명령을 적용하고(문 규칙 12), 접근위험 입력이 VALID로 FALSE가 될 때까지 유지해 그동안 그 문에 접근위험 규칙을 적용하지 않는다 | 질의 Q-22. 해석: "명시적 override로 처리" |
 | A-20 | 10초 | 첫 억제로부터 10,000 ms 이하이면 "10초 이하"이며 경계(10,000 ms)는 포함한다. 같은 명령은 같은 문을 대상으로 하는 unlock이면 된다(side가 달라도 그 문을 포함하면 같다) | OEM-FR-003의 "10초 이하", "같은 도어" |
 | A-21 | 접근위험 해제 | 접근위험 입력이 VALID로 FALSE가 되면 억제 기록과 override를 지운다. INVALID나 STALE일 때는 지우지 않는다 | 입력 상태 규칙(원인 해소) |
+| A-22 | 제어 결정 | 제어 결정 한 건은 받아들여진 평가의 결과(lock_left, lock_right, state, reason_code)가 직전 받아들여진 평가 결과(첫 평가는 초기 결과)와 하나라도 다른 평가다. 같은 결과가 반복되는 평가는 이력에 넣지 않는다 | 100건을 의미 있는 기간 동안 보존하기 위해. 질의 Q-24 |
+| A-23 | 직렬화 | 상태 조회의 표시용 표현은 Web 대신 한 줄 JSON 문자열이며, 직렬화 실패(버퍼 부족)는 STATUS_ERR_BUFFER로 알린다(OEM-IF-006의 HTTP 500에 대응) | 승인된 권고안 A2(Web 제외). 질의 Q-25 |
 
 ## 5. 입력 검사 규칙 (SWR-022, SWR-033, SWR-040 상세)
 
@@ -202,7 +214,7 @@
 | lock_left, lock_right | LOCK, RELEASE |
 | state | NORMAL, DEGRADED, FAULT, OFF |
 | input_validity (입력 항목별) | VALID, INVALID, STALE |
-| 반환 상태 | STATUS_OK, STATUS_ERR_TIME |
+| 반환 상태 | STATUS_OK, STATUS_ERR_PARAM, STATUS_ERR_TIME, STATUS_ERR_BUFFER |
 | reason_code, priority_reason (같은 값) | NONE, CRASH_CONFIRMED, SENSOR_FAULT, INPUT_INVALID, INPUT_STALE, CRASH_PENDING, IGNITION_OFF, FIRE, OVERTEMPERATURE, ADULT_PRESENT, APPROACH_RISK, APPROACH_OVERRIDE, ISOFIX, AUTO_LOCK, DRIVER_COMMAND |
 | warning_code | NONE, SENSOR_FAULT |
 | command_status | NONE, ACCEPTED, REJECTED |
@@ -256,6 +268,12 @@
 | INVALID | 저장 상태가 INVALID |
 | STALE | 저장 상태가 OK이고, 받아들인 스냅샷이 아직 없거나 now_ms − 마지막 수신 시각 > 200 ms |
 | VALID | 그 밖 |
+### 5.6 상태 직렬화 형식 (SWR-015)
+
+한 줄 JSON이며 키 순서는 고정이다(공백 없음). 입력 항목 이름은 vehicle_speed, gear, source_timestamp, crash_status, rear_left_approach_risk, rear_right_approach_risk, fire_detected, overtemperature_detected, adult_present, isofix_left, isofix_right, ignition_on, sensor_fault 순이다. 값은 5.3절 값 집합의 이름(예: "LOCK", "NORMAL", "VALID")이며 범위 밖 값은 "UNKNOWN"이다.
+
+초기 결과의 예:
+`{"lock_left":"RELEASE","lock_right":"RELEASE","state":"NORMAL","priority_reason":"NONE","reason_code":"NONE","warning_code":"NONE","command_status":"NONE","override_left":false,"override_right":false,"input_validity":{"vehicle_speed":"STALE","gear":"STALE",...,"sensor_fault":"STALE"}}`
 
 ## 6. 개정 이력
 
@@ -267,3 +285,4 @@
 | 0.4 | 2026-11-27 | SWR-007, SWR-013, SWR-021, SWR-022, SWR-023, SWR-025, SWR-028, SWR-032, SWR-034, SWR-035, SWR-039, SWR-040, SWR-041, SWR-044, SWR-046, SWR-047 | SWE.1 리뷰 3회 부적합 15건 조치: INVALID가 유효 갱신까지 이어지도록 입력 상태 재정의, timestamp 거절 요구(046), now_ms 거절 흐름, 초기 출력 전체 정의, 결정 규칙표(5.4), FAULT·DEGRADED 동시 가정(A-15), SWR-032 분리(047), 용어(DEGRADED 조건, 스냅샷 시각, 받아들인 스냅샷) 정의 | 안전 요구사항 문서, iter-1.md |
 | 0.5 | 2026-11-27 | SWR-007, SWR-008, SWR-013, SWR-022, SWR-024, SWR-026, SWR-027, SWR-032, SWR-035, SWR-040, SWR-046 | SWE.1 리뷰 4회 부적합 11건 조치와 단순화: freshness를 스냅샷 단위(마지막 수신 시각)로, 시간 입력을 정수 ms로, 입력 상태 전이표(5.5절) 도입, 반환 상태 값 정의, 도달 불가능한 조합(입력별 STALE) 제거. SWR-045는 SWR-013에 통합하고 번호는 재사용하지 않는다 | 안전 요구사항 문서, iter-1.md |
 | 0.6 | 2026-11-27 | SWR-001, SWR-002, SWR-003, SWR-005, SWR-006, SWR-009, SWR-017, SWR-018, SWR-020, SWR-023, SWR-025, SWR-035, SWR-036, SWR-048 | 이터레이션 2 범위 추가: 문 단위 규칙(접근위험, ISOFIX, 자동 잠금, 운전자 명령), 전역 해제 규칙(ignition off, 화재, 과온, 성인), override. 결정 규칙표 확장(5.4절), 질의 Q-21, Q-22, Q-23, 가정 A-16~A-21 | 안전 요구사항 문서, iter-2.md |
+| 0.7 | 2026-11-27 | SWR-004, SWR-010, SWR-011, SWR-012, SWR-014, SWR-015 | 이터레이션 3 범위 추가: 일반 해제 허용 조건, 상태 조회와 직렬화(5.6절), 제어 결정 이력 100건. 질의 Q-24, Q-25, 가정 A-22, A-23 | 아키텍처 설계서, iter-3.md |

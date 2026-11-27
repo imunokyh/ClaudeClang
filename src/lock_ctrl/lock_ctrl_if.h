@@ -1,7 +1,7 @@
 /**
  * @file lock_ctrl_if.h
  * @brief 차일드락 제어 컴포넌트 인터페이스 (CMP-003, IF-003). 호출자가 쓰는 공개 API.
- * @trace SWR-025 SWR-026 SWR-027 SWR-031 SWR-039 SWR-040 SWR-044
+ * @trace SWR-004 SWR-010 SWR-014 SWR-025 SWR-026 SWR-027 SWR-031 SWR-039 SWR-040 SWR-044
  */
 #ifndef LOCK_CTRL_LOCK_CTRL_IF_H
 #define LOCK_CTRL_LOCK_CTRL_IF_H
@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "common/types_if.h"
+#include "decision_log/decision_log_if.h"
 #include "input_guard/input_guard_if.h"
 
 #ifdef __cplusplus
@@ -28,6 +29,7 @@ typedef struct
     uint32_t last_now_ms;      /**< 직전에 받아들여진 평가의 now_ms */
     bool has_evaluated;        /**< 받아들여진 평가가 있는가 */
     lock_ctrl_result_t result; /**< 마지막 결과 (초기화 직후에는 초기 결과) */
+    decision_log_t log;        /**< 제어 결정 이력 (메모리에만 있다) */
 } lock_ctrl_t;
 
 /**
@@ -83,6 +85,42 @@ NODISCARD status_t lock_ctrl_evaluate(lock_ctrl_t *ctrl, const lock_ctrl_input_t
  * - 일시: 2026-11-27
  */
 NODISCARD status_t lock_ctrl_get_result(const lock_ctrl_t *ctrl, lock_ctrl_result_t *result);
+
+/**
+ * @brief 제어 결정 이력 건수를 조회한다.
+ * @trace FN-047
+ * @param ctrl 제어기 (NULL 불가)
+ * @param count 출력: 건수 0~100 (NULL 불가)
+ * @return STATUS_OK, STATUS_ERR_PARAM (ctrl 또는 count 가 NULL)
+ * @par AI 작성
+ * - 모델: claude-sonnet-5-5
+ * - 일시: 2026-11-27
+ * - 요청자: imunokyh
+ * @par 사용자 리뷰
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
+ */
+NODISCARD status_t lock_ctrl_get_log_count(const lock_ctrl_t *ctrl, uint32_t *count);
+
+/**
+ * @brief 제어 결정 이력 항목을 오래된 것부터 조회한다.
+ * @trace FN-048
+ * @param ctrl 제어기 (NULL 불가)
+ * @param index 0이 가장 오래된 항목 (건수 미만)
+ * @param entry 출력: 항목 (NULL 불가)
+ * @return STATUS_OK, STATUS_ERR_PARAM (NULL 이거나 index 가 건수 이상)
+ * @par AI 작성
+ * - 모델: claude-sonnet-5-5
+ * - 일시: 2026-11-27
+ * - 요청자: imunokyh
+ * @par 사용자 리뷰
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
+ */
+NODISCARD status_t lock_ctrl_get_log_entry(const lock_ctrl_t *ctrl, uint32_t index,
+                                           decision_entry_t *entry);
 
 #ifdef __cplusplus
 }

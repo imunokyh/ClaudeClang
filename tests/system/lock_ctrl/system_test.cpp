@@ -6,8 +6,10 @@
 
 #include <chrono>
 #include <limits>
+#include <string>
 
 #include "lock_ctrl/lock_ctrl_if.h"
+#include "status_view/status_view_if.h"
 
 namespace
 {
@@ -62,6 +64,21 @@ class Rig
     const lock_ctrl_result_t &r() const
     {
         return result_;
+    }
+
+    status_t log_count(uint32_t *count) const
+    {
+        return lock_ctrl_get_log_count(&ctrl_, count);
+    }
+
+    status_t log_entry(uint32_t index, decision_entry_t *entry) const
+    {
+        return lock_ctrl_get_log_entry(&ctrl_, index, entry);
+    }
+
+    status_t reinit()
+    {
+        return lock_ctrl_init(&ctrl_, nullptr);
     }
 
     lock_ctrl_result_t current() const
@@ -683,6 +700,201 @@ TEST(SystemFunctional, Ftc045CommandDroppedUnderGlobalRule)
     EXPECT_EQ(LOCK_LOCK, rig.r().outputs.left);
     EXPECT_EQ(LOCK_LOCK, rig.r().outputs.right);
     EXPECT_EQ(REASON_NONE, rig.r().reason);
+}
+
+namespace
+{
+
+/** 결정을 바꾸는 평가를 count번 한다(sensor_fault를 번갈아 TRUE, FALSE). */
+void change_decisions(Rig &rig, uint32_t count, uint32_t start_ms)
+{
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        rig.set(ITEM_SENSOR_FAULT, (i % 2 == 0) ? 1.0 : 0.0);
+        ASSERT_EQ(STATUS_OK, rig.step(start_ms + 10 * i));
+    }
+}
+
+} // namespace
+
+// FTC-046
+TEST(SystemFunctional, Ftc046GeneralReleaseConditions)
+{
+    struct Case
+    {
+        input_item_t item;
+        double value;
+        lock_cmd_t left;
+        lock_cmd_t right;
+    };
+    const Case cases[] = {{ITEM_REAR_LEFT_APPROACH_RISK, 1.0, LOCK_LOCK, LOCK_RELEASE},
+                          {ITEM_ISOFIX_RIGHT, 1.0, LOCK_RELEASE, LOCK_LOCK},
+                          {ITEM_VEHICLE_SPEED, 10.0, LOCK_LOCK, LOCK_LOCK},
+                          {ITEM_SENSOR_FAULT, 1.0, LOCK_LOCK, LOCK_LOCK},
+                          {ITEM_GEAR, 0.0, LOCK_RELEASE, LOCK_RELEASE}};
+    for (const Case &c : cases)
+    {
+        Rig rig(LOCK_LOCK);
+        rig.set(c.item, c.value);
+        ASSERT_EQ(STATUS_OK, rig.step(10, true, &kUnlockAll));
+        EXPECT_EQ(c.left, rig.r().outputs.left);
+        EXPECT_EQ(c.right, rig.r().outputs.right);
+    }
+}
+
+// FTC-047
+TEST(SystemFunctional, Ftc047StatusQuery)
+{
+    Rig rig(LOCK_RELEASE);
+    lock_ctrl_result_t initial = rig.current();
+    EXPECT_EQ(STATE_NORMAL, initial.state);
+    rig.set(ITEM_REAR_LEFT_APPROACH_RISK, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    lock_ctrl_result_t first = rig.current();
+    EXPECT_EQ(LOCK_LOCK, first.outputs.left);
+    EXPECT_EQ(REASON_APPROACH_RISK, first.reason);
+    EXPECT_EQ(REASON_APPROACH_RISK, first.priority_reason);
+    EXPECT_TRUE(all_validity(first, VALIDITY_VALID));
+    EXPECT_FALSE(first.override_active[DOOR_LEFT]);
+    ASSERT_EQ(STATUS_OK, rig.step(20, true, &kUnlockLeft));
+    lock_ctrl_result_t second = rig.current();
+    EXPECT_EQ(COMMAND_ACCEPTED, second.command_status);
+    EXPECT_EQ(LOCK_LOCK, second.outputs.left);
+}
+
+// FTC-048
+TEST(SystemFunctional, Ftc048InitialJson)
+{
+    Rig rig(LOCK_RELEASE);
+    lock_ctrl_result_t result = rig.current();
+    char buffer[1024] = {};
+    ASSERT_EQ(STATUS_OK, status_view_format(&result, buffer, sizeof(buffer)));
+    const char *names[] = {"vehicle_speed",
+                           "gear",
+                           "source_timestamp",
+                           "crash_status",
+                           "rear_left_approach_risk",
+                           "rear_right_approach_risk",
+                           "fire_detected",
+                           "overtemperature_detected",
+                           "adult_present",
+                           "isofix_left",
+                           "isofix_right",
+                           "ignition_on",
+                           "sensor_fault"};
+    std::string expected =
+        "{\"lock_left\":\"RELEASE\",\"lock_right\":\"RELEASE\",\"state\":\"NORMAL\","
+        "\"priority_reason\":\"NONE\",\"reason_code\":\"NONE\",\"warning_code\":\"NONE\","
+        "\"command_status\":\"NONE\",\"override_left\":false,\"override_right\":false,"
+        "\"input_validity\":{";
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
+        expected += std::string(i == 0 ? "" : ",") + "\"" + names[i] + "\":\"STALE\"";
+    }
+    expected += "}}";
+    EXPECT_EQ(expected, std::string(buffer));
+}
+
+// FTC-049
+TEST(SystemFunctional, Ftc049BufferBoundary)
+{
+    Rig rig(LOCK_RELEASE);
+    lock_ctrl_result_t result = rig.current();
+    char big[1024] = {};
+    ASSERT_EQ(STATUS_OK, status_view_format(&result, big, sizeof(big)));
+    const size_t needed = std::string(big).size() + 1;
+    char exact[1024] = {};
+    EXPECT_EQ(STATUS_OK, status_view_format(&result, exact, needed));
+    char small[1024];
+    for (char &c : small)
+    {
+        c = 'x';
+    }
+    EXPECT_EQ(STATUS_ERR_BUFFER, status_view_format(&result, small, needed - 1));
+    EXPECT_EQ('\0', small[0]);
+}
+
+// FTC-050
+TEST(SystemFunctional, Ftc050SerializationParameters)
+{
+    Rig rig(LOCK_RELEASE);
+    lock_ctrl_result_t result = rig.current();
+    char buffer[16] = {};
+    EXPECT_EQ(STATUS_ERR_PARAM, status_view_format(nullptr, buffer, sizeof(buffer)));
+    EXPECT_EQ(STATUS_ERR_PARAM, status_view_format(&result, nullptr, sizeof(buffer)));
+    EXPECT_EQ(STATUS_ERR_PARAM, status_view_format(&result, buffer, 0));
+}
+
+// FTC-051
+TEST(SystemFunctional, Ftc051LogRecordsChanges)
+{
+    Rig rig(LOCK_LOCK);
+    ASSERT_EQ(STATUS_OK, rig.step(10));
+    rig.set(ITEM_SENSOR_FAULT, 1.0);
+    ASSERT_EQ(STATUS_OK, rig.step(20));
+    ASSERT_EQ(STATUS_OK, rig.step(30));
+    rig.set(ITEM_SENSOR_FAULT, 0.0);
+    ASSERT_EQ(STATUS_OK, rig.step(40));
+    uint32_t count = 0;
+    ASSERT_EQ(STATUS_OK, rig.log_count(&count));
+    ASSERT_EQ(2u, count);
+    decision_entry_t entry = {};
+    ASSERT_EQ(STATUS_OK, rig.log_entry(0, &entry));
+    EXPECT_EQ(1u, entry.event_id);
+    EXPECT_EQ(20u, entry.now_ms);
+    EXPECT_EQ(STATE_FAULT, entry.state);
+    EXPECT_EQ(REASON_SENSOR_FAULT, entry.reason);
+    EXPECT_EQ(WARNING_SENSOR_FAULT, entry.warning);
+    EXPECT_EQ(LOCK_LOCK, entry.outputs.left);
+    EXPECT_EQ(LOCK_LOCK, entry.outputs.right);
+    ASSERT_EQ(STATUS_OK, rig.log_entry(1, &entry));
+    EXPECT_EQ(2u, entry.event_id);
+    EXPECT_EQ(40u, entry.now_ms);
+    EXPECT_EQ(STATE_NORMAL, entry.state);
+    EXPECT_EQ(REASON_NONE, entry.reason);
+    EXPECT_EQ(WARNING_NONE, entry.warning);
+}
+
+// FTC-052
+TEST(SystemFunctional, Ftc052LogRetention)
+{
+    Rig hundred(LOCK_LOCK);
+    change_decisions(hundred, 100, 10);
+    uint32_t count = 0;
+    ASSERT_EQ(STATUS_OK, hundred.log_count(&count));
+    EXPECT_EQ(100u, count);
+    decision_entry_t entry = {};
+    ASSERT_EQ(STATUS_OK, hundred.log_entry(0, &entry));
+    EXPECT_EQ(1u, entry.event_id);
+    ASSERT_EQ(STATUS_OK, hundred.log_entry(99, &entry));
+    EXPECT_EQ(100u, entry.event_id);
+
+    Rig over(LOCK_LOCK);
+    change_decisions(over, 101, 10);
+    ASSERT_EQ(STATUS_OK, over.log_count(&count));
+    EXPECT_EQ(100u, count);
+    ASSERT_EQ(STATUS_OK, over.log_entry(0, &entry));
+    EXPECT_EQ(2u, entry.event_id);
+    ASSERT_EQ(STATUS_OK, over.log_entry(99, &entry));
+    EXPECT_EQ(101u, entry.event_id);
+    EXPECT_EQ(STATUS_ERR_PARAM, over.log_entry(100, &entry));
+}
+
+// FTC-053
+TEST(SystemFunctional, Ftc053LogClearedOnInit)
+{
+    Rig rig(LOCK_LOCK);
+    change_decisions(rig, 3, 10);
+    uint32_t count = 0;
+    ASSERT_EQ(STATUS_OK, rig.log_count(&count));
+    ASSERT_EQ(3u, count);
+    ASSERT_EQ(STATUS_OK, rig.reinit());
+    ASSERT_EQ(STATUS_OK, rig.log_count(&count));
+    EXPECT_EQ(0u, count);
+    change_decisions(rig, 1, 1000);
+    decision_entry_t entry = {};
+    ASSERT_EQ(STATUS_OK, rig.log_entry(0, &entry));
+    EXPECT_EQ(1u, entry.event_id);
 }
 
 // NTC-001

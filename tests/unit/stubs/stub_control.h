@@ -12,6 +12,15 @@ struct StubControl
     status_t update_status;
     status_t check_status;
     status_t decide_status;
+    status_t log_init_status;
+    status_t log_append_status;
+    status_t log_count_status;
+    status_t log_get_status;
+    uint32_t log_count_value;
+    decision_entry_t log_get_entry;
+    int log_append_calls;
+    decision_entry_t last_appended;
+    uint32_t last_get_index;
     normalized_inputs_t normalized;
     checked_command_t checked;
     decision_t decision;

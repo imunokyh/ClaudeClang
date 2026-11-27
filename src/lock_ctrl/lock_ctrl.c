@@ -1,13 +1,14 @@
 /**
  * @file lock_ctrl.c
  * @brief 차일드락 제어 컴포넌트 구현 (CMP-003, MOD-003). 평가 순서를 지휘한다.
- * @trace SWR-025 SWR-026 SWR-027 SWR-031 SWR-039 SWR-040 SWR-044 SWR-048
+ * @trace SWR-004 SWR-010 SWR-014 SWR-025 SWR-026 SWR-027 SWR-031 SWR-039 SWR-040 SWR-044 SWR-048
  */
 #include "lock_ctrl/lock_ctrl_if.h"
 
 #include <stddef.h>
 
 #include "arbiter/arbiter_if.h"
+#include "decision_log/decision_log_if.h"
 #include "input_guard/input_guard_if.h"
 
 /**
@@ -122,6 +123,59 @@ static status_t build_result(const decision_t *decision, const normalized_inputs
 }
 
 /**
+ * @brief 출력, state, 결정 이유 중 하나가 달라졌는지 판정한다.
+ * @trace FN-046
+ * @param previous 직전 결과 (NULL 불가)
+ * @param next 새 결과 (NULL 불가)
+ * @return 하나라도 다르면 true
+ * @par AI 작성
+ * - 모델: claude-sonnet-5-5
+ * - 일시: 2026-11-27
+ * - 요청자: imunokyh
+ * @par 사용자 리뷰
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
+ */
+static bool is_decision_change(const lock_ctrl_result_t *previous, const lock_ctrl_result_t *next)
+{
+    return (previous->outputs.left != next->outputs.left) ||
+           (previous->outputs.right != next->outputs.right) || (previous->state != next->state) ||
+           (previous->reason != next->reason);
+}
+
+/**
+ * @brief 결정이 바뀌었으면 이력에 추가한다. 호출 시점의 ctrl->result 는 직전 결과다.
+ * @trace FN-049
+ * @param ctrl 제어기 (NULL 불가)
+ * @param built 새 결과 (NULL 불가)
+ * @param now_ms 평가 시각 (ms)
+ * @return STATUS_OK 또는 이력 추가의 오류 코드
+ * @par AI 작성
+ * - 모델: claude-sonnet-5-5
+ * - 일시: 2026-11-27
+ * - 요청자: imunokyh
+ * @par 사용자 리뷰
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
+ */
+static status_t record_decision(lock_ctrl_t *ctrl, const lock_ctrl_result_t *built, uint32_t now_ms)
+{
+    status_t status = STATUS_OK;
+
+    if (is_decision_change(&ctrl->result, built))
+    {
+        const decision_entry_t entry = {
+            0, now_ms, built->outputs, built->state, built->reason, built->warning};
+
+        status = decision_log_append(&ctrl->log, &entry);
+    }
+
+    return status;
+}
+
+/**
  * @brief 입력 검사, 명령 검사, 결정을 호출해 결과를 구성하고 상태를 갱신한다.
  * @trace FN-024
  * @param ctrl 입출력: 제어기 (NULL 불가)
@@ -167,6 +221,10 @@ static status_t run_evaluation(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input
     }
     if (status == STATUS_OK)
     {
+        status = record_decision(ctrl, &built, input->now_ms);
+    }
+    if (status == STATUS_OK)
+    {
         ctrl->result = built;
         ctrl->outputs = decision.outputs;
         ctrl->approach = decision.approach;
@@ -205,6 +263,10 @@ status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config)
     if ((ctrl != NULL) && is_valid_initial_outputs(&initial))
     {
         status = input_guard_init(&ctrl->guard);
+    }
+    if (status == STATUS_OK)
+    {
+        status = decision_log_init(&ctrl->log);
     }
     if (status == STATUS_OK)
     {
@@ -278,6 +340,61 @@ status_t lock_ctrl_get_result(const lock_ctrl_t *ctrl, lock_ctrl_result_t *resul
     {
         *result = ctrl->result;
         status = STATUS_OK;
+    }
+
+    return status;
+}
+
+/**
+ * @brief 제어 결정 이력 건수를 조회한다.
+ * @trace FN-047
+ * @param ctrl 제어기 (NULL 불가)
+ * @param count 출력: 건수 0~100 (NULL 불가)
+ * @return STATUS_OK, STATUS_ERR_PARAM (ctrl 또는 count 가 NULL)
+ * @par AI 작성
+ * - 모델: claude-sonnet-5-5
+ * - 일시: 2026-11-27
+ * - 요청자: imunokyh
+ * @par 사용자 리뷰
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
+ */
+status_t lock_ctrl_get_log_count(const lock_ctrl_t *ctrl, uint32_t *count)
+{
+    status_t status = STATUS_ERR_PARAM;
+
+    if (ctrl != NULL)
+    {
+        status = decision_log_count(&ctrl->log, count);
+    }
+
+    return status;
+}
+
+/**
+ * @brief 제어 결정 이력 항목을 오래된 것부터 조회한다.
+ * @trace FN-048
+ * @param ctrl 제어기 (NULL 불가)
+ * @param index 0이 가장 오래된 항목 (건수 미만)
+ * @param entry 출력: 항목 (NULL 불가)
+ * @return STATUS_OK, STATUS_ERR_PARAM (NULL 이거나 index 가 건수 이상)
+ * @par AI 작성
+ * - 모델: claude-sonnet-5-5
+ * - 일시: 2026-11-27
+ * - 요청자: imunokyh
+ * @par 사용자 리뷰
+ * - 상태: 완료
+ * - 리뷰어: imunokyh
+ * - 일시: 2026-11-27
+ */
+status_t lock_ctrl_get_log_entry(const lock_ctrl_t *ctrl, uint32_t index, decision_entry_t *entry)
+{
+    status_t status = STATUS_ERR_PARAM;
+
+    if (ctrl != NULL)
+    {
+        status = decision_log_get(&ctrl->log, index, entry);
     }
 
     return status;

@@ -1,7 +1,7 @@
 # SW 단위 테스트 명세
 
-- 대상 SW: 전자식 차일드락 제어 SW   버전: 0.2 (이터레이션 1~2)   일자: 2026-11-27
-- 입력: docs/swe3/detailed-design.md (v0.4)
+- 대상 SW: 전자식 차일드락 제어 SW   버전: 0.3 (이터레이션 1~3)   일자: 2026-11-27
+- 입력: docs/swe3/detailed-design.md (v0.5)
 - 테스트 코드: `tests/unit/` (GoogleTest). TDD 테스트(`tests/tdd/`)와 분리되어 있으며 단위 테스트는 상세 설계의 결정표에서 새로 도출했다.
 - 기준: 테스트 성공률 100%, MC/DC 커버리지 100% (모든 `src/` 파일)
 - 기법: 결정표 기반(MC/DC 벡터), 동치 클래스 분할, 경계값 분석, 스텁(`lock_ctrl`의 하위 컴포넌트만)
@@ -69,12 +69,27 @@
 | UT-080 | FN-020, FN-026 | lock_ctrl_test: LockCtrlApproach.InitClearsApproachState | 초기화의 접근위험 기록 | 결정표 | 채워진 기록 | 모두 지움, override false |
 | UT-081 | FN-024, FN-025 | lock_ctrl_test: LockCtrlApproach.ApproachStateIsCommittedAndPassedOn | 접근위험 기록 확정 | 스텁 | 스텁 결정의 기록 | 결과 override와 다음 평가 입력 |
 | UT-082 | FN-024 | lock_ctrl_test: LockCtrlApproach.FailedDecideDoesNotCommitApproachState | 실패 시 기록 불변 | 스텁, 결정표 R3 | decide 실패 | 기록 확정 안 함 |
+| UT-090 | FN-042 | decision_log_test: DecisionLogInit.NullAndReset | 이력 초기화 | 결정표 | NULL, 채워진 저장소 | ERR_PARAM / 건수 0, ID 1 |
+| UT-091 | FN-043 | decision_log_test: DecisionLogAppend.NullArgumentsAreRejected | 추가 인자 오류 | 결정표 R1, R2 | log, entry NULL | STATUS_ERR_PARAM |
+| UT-092 | FN-043, FN-045 | decision_log_test: DecisionLogAppend.AssignsIdsInOrder | 이벤트 ID 부여와 순서 | 결정표 R3 | 항목 3개 | ID 1~3 오래된 순 |
+| UT-093 | FN-043, FN-044, FN-045 | decision_log_test: DecisionLogAppend.KeepsLatestHundred | 100건 보존 경계 | 경계값 분석 | 100, 101, 250건 | 최신 100건, ID 연속 |
+| UT-094 | FN-044, FN-045 | decision_log_test: DecisionLogQuery.NullArgumentsAreRejected | 조회 인자 오류 | 결정표 | NULL 각각 | STATUS_ERR_PARAM |
+| UT-100 | FN-037 | status_view_test: StatusViewParams.NullAndZeroSize | 직렬화 인자 오류 | 결정표 R1~R3 | NULL, 크기 0 | STATUS_ERR_PARAM |
+| UT-101 | FN-037, FN-039, FN-040 | status_view_test: StatusViewFormat.ExactString | 정확한 문자열 | 대표값 | 혼합 결과 | 5.6절 JSON |
+| UT-102 | FN-038 | status_view_test: StatusViewFormat.EnumNamesAndUnknown | 열거 이름과 UNKNOWN | 경계값 분석, MC/DC | 범위 안, 음수, 개수와 같은 값 | 이름 / UNKNOWN |
+| UT-103 | FN-039 | status_view_test: StatusViewFormat.OverrideFlags | override 표기 | 동치 클래스 | 4조합 | true/false |
+| UT-104 | FN-041 | status_view_test: StatusViewFormat.BufferBoundary | 버퍼 크기 경계 | 경계값 분석 | 크기 1~필요 길이+1 | 성공 / STATUS_ERR_BUFFER |
+| UT-110 | FN-046, FN-049 | lock_ctrl_test: LockCtrlLog.AppendsOnlyOnChange | 변화 시에만 이력 추가 | 결정표, 스텁 | 같은 결정, 다른 결정 | 추가 0회, 1회와 필드 |
+| UT-111 | FN-046 | lock_ctrl_test: LockCtrlLog.EachFieldChangeIsADecision | 필드별 결정 변화 | MC/DC | 좌, 우, state, 이유, 경고만 다름 | 경고만 다르면 추가 안 함 |
+| UT-112 | FN-024, FN-049 | lock_ctrl_test: LockCtrlLog.AppendFailureIsNotCommitted | 추가 실패 시 불변 | 스텁, 결정표 R6 | append 실패 | 오류, 상태 불변 |
+| UT-113 | FN-020 | lock_ctrl_test: LockCtrlLog.LogInitFailureIsPropagated | 이력 초기화 실패 | 스텁 | init 실패 | 오류 전파 |
+| UT-114 | FN-047, FN-048 | lock_ctrl_test: LockCtrlLog.QueryPassThrough | 이력 조회 전달 | 스텁 | ctrl NULL, 정상, 오류 | ERR_PARAM / 값 전달 |
 
 ## 2. 스텁
 
 | 스텁 | 대체하는 인터페이스 | 사유 |
 |---|---|---|
-| `tests/unit/stubs/component_stubs.cpp` | IF-001(input_guard), IF-002(arbiter) | `lock_ctrl`의 방어 경로(하위 호출 오류)는 실제 컴포넌트로는 만들 수 없어 스텁으로 오류를 주입한다. `input_guard`, `arbiter` 자신의 시험은 실제 구현으로 한다 |
+| `tests/unit/stubs/component_stubs.cpp` | IF-001(input_guard), IF-002(arbiter), IF-006(decision_log) | `lock_ctrl`의 방어 경로(하위 호출 오류)는 실제 컴포넌트로는 만들 수 없어 스텁으로 오류를 주입한다. `input_guard`, `arbiter` 자신의 시험은 실제 구현으로 한다 |
 
 ## 3. 개정 이력
 
@@ -82,3 +97,4 @@
 |---|---|---|---|---|
 | 0.1 | 2026-11-27 | UT-001, UT-002, UT-003, UT-004, UT-005, UT-006, UT-007, UT-008, UT-009, UT-010, UT-011, UT-012, UT-013, UT-014, UT-020, UT-021, UT-022, UT-023, UT-024, UT-025, UT-026, UT-027, UT-028, UT-029, UT-030, UT-040, UT-041, UT-042, UT-043, UT-044, UT-045, UT-046, UT-047, UT-048, UT-049, UT-050, UT-051, UT-052, UT-053 | 이터레이션 1 최초 작성 (단계 리뷰는 사용자 지시로 생략) | 없음 |
 | 0.2 | 2026-11-27 | UT-013, UT-014, UT-020, UT-021, UT-060, UT-061, UT-062, UT-063, UT-064, UT-065, UT-066, UT-067, UT-068, UT-069, UT-070, UT-071, UT-072, UT-073, UT-074, UT-080, UT-081, UT-082 | 이터레이션 2: 검사한 명령 구조체와 arbiter 입력 구조체에 맞춰 UT-013, 014, 020, 021 수정, 문 규칙·전역 규칙·접근위험 시험 추가 | 상세 설계서 |
+| 0.3 | 2026-11-27 | UT-090, UT-091, UT-092, UT-093, UT-094, UT-100, UT-101, UT-102, UT-103, UT-104, UT-110, UT-111, UT-112, UT-113, UT-114 | 이터레이션 3: 이력, 직렬화, lock_ctrl 이력 기록 시험 추가 | 상세 설계서 |

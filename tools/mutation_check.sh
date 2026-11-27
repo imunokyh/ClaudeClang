@@ -32,6 +32,10 @@ MUTANTS=(
     "src/arbiter/arbiter.c|else if (!current.override_active)|else if (current.override_active)|override 성립 문의 접근위험 규칙"
     "src/arbiter/arbiter.c|result = step.overridden|result = !step.overridden|override 이유"
     "src/arbiter/arbiter.c|else if (has_item_value(inputs, ITEM_IGNITION_ON, BOOL_FALSE))|else if (has_item_value(inputs, ITEM_IGNITION_ON, BOOL_TRUE))|ignition off 규칙"
+    "src/decision_log/decision_log.c|if (log->count < DECISION_LOG_CAPACITY)|if (log->count <= DECISION_LOG_CAPACITY)|이력 보존 상한(100건)"
+    "src/decision_log/decision_log.c|(index < log->count)|(index <= log->count)|이력 조회 index 경계"
+    "src/status_view/status_view.c|if (total < size)|if (total <= size)|직렬화 버퍼 경계(널 문자 포함)"
+    "src/lock_ctrl/lock_ctrl.c|(previous->state != next->state)|(previous->state == next->state)|결정 변화 판정(state)"
 )
 
 killed=0

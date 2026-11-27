@@ -1,9 +1,9 @@
 # SW 아키텍처 설계서
 
-- 대상 SW: 전자식 차일드락 제어 SW (후석 좌, 우)   버전: 0.2 (이터레이션 1~2)   일자: 2026-11-27
-- 입력: docs/swe1/software-requirements.md (v0.6), docs/swe1/safety-requirements.md (v0.6)
+- 대상 SW: 전자식 차일드락 제어 SW (후석 좌, 우)   버전: 0.3 (이터레이션 1~3)   일자: 2026-11-27
+- 입력: docs/swe1/software-requirements.md (v0.7), docs/swe1/safety-requirements.md (v0.6)
 - 면책: 교육용 가상 OEM 입력에 대한 설계이며 준수·인증·ASIL 달성을 주장하지 않는다.
-- 이터레이션 1은 입력 검사, 신선도, 결정 규칙(충돌, sensor_fault, 입력 무효·오래됨), 상태 보고를 다룬다. 이터레이션 2는 `arbiter`에 전역 해제 규칙(ignition off, 화재, 과온, 성인)과 문 단위 규칙(접근위험·override, ISOFIX, 자동 잠금, 운전자 명령)을 추가한다. 상태가 필요한 문별 접근위험 억제·override 기록은 `lock_ctrl`이 소유하고 `arbiter`는 입력과 기록을 받아 새 기록을 계산해 돌려준다(상태 없는 순수 판정 유지).
+- 이터레이션 1은 입력 검사, 신선도, 결정 규칙(충돌, sensor_fault, 입력 무효·오래됨), 상태 보고를 다룬다. 이터레이션 3은 표시용 직렬화 컴포넌트 `status_view`와 제어 결정 이력 컴포넌트 `decision_log`를 추가한다(`decision_log`는 `lock_ctrl`이 소유하고 평가마다 갱신한다). 이터레이션 2는 `arbiter`에 전역 해제 규칙(ignition off, 화재, 과온, 성인)과 문 단위 규칙(접근위험·override, ISOFIX, 자동 잠금, 운전자 명령)을 추가한다. 상태가 필요한 문별 접근위험 억제·override 기록은 `lock_ctrl`이 소유하고 `arbiter`는 입력과 기록을 받아 새 기록을 계산해 돌려준다(상태 없는 순수 판정 유지).
 
 ## 1. 구조 개요
 
@@ -29,8 +29,10 @@ flowchart TD
 |---|---|---|---|---|---|---|---|
 | CMP-001 | input_guard (`src/input_guard/`) | 스냅샷과 운전자 명령의 유효성을 검사하고 입력 항목별 입력 상태를 정한다 | 입력 항목별 저장 상태, 보관 값, 마지막 수신 시각, 직전에 받아들인 스냅샷 시각 | ASIL B | IF-001 | IF-004 | SWR-013, SWR-022, SWR-033, SWR-046, SAF-003, SAF-005 |
 | CMP-002 | arbiter (`src/arbiter/`) | 정규화된 입력, 직전 확정 출력, 이번 평가의 명령, 문별 접근위험 기록으로 결정 규칙표에 따라 출력, state, 결정 이유, 경고, 새 접근위험 기록을 정한다 | 없음(상태 없는 순수 판정) | ASIL B | IF-002 | IF-004 | SWR-001, SWR-002, SWR-003, SWR-005, SWR-006, SWR-007, SWR-008, SWR-009, SWR-017, SWR-018, SWR-020, SWR-021, SWR-023, SWR-024, SWR-034, SWR-035, SWR-036, SWR-048, SAF-001, SAF-002, SAF-004 |
-| CMP-003 | lock_ctrl (`src/lock_ctrl/`) | 평가 시각을 검사하고 입력 검사와 결정을 정해진 순서로 호출하며 직전 확정 출력을 보관해 결과를 호출자에게 낸다 | 직전 확정 출력, 직전에 받아들여진 평가의 now_ms, 마지막 결과, 문별 접근위험 억제·override 기록 | ASIL B | IF-003 | IF-001, IF-002, IF-004 | SWR-025, SWR-026, SWR-027, SWR-031, SWR-039, SWR-040, SWR-044, SAF-002, SAF-003 |
+| CMP-003 | lock_ctrl (`src/lock_ctrl/`) | 평가 시각을 검사하고 입력 검사와 결정을 정해진 순서로 호출하며 직전 확정 출력을 보관해 결과를 호출자에게 낸다 | 직전 확정 출력, 직전에 받아들여진 평가의 now_ms, 마지막 결과, 문별 접근위험 억제·override 기록, 제어 결정 이력(CMP-006 저장소) | ASIL B | IF-003 | IF-001, IF-002, IF-006, IF-004 | SWR-025, SWR-026, SWR-027, SWR-031, SWR-039, SWR-040, SWR-004, SWR-010, SWR-044, SAF-002, SAF-003 |
 | CMP-004 | common (`src/common/`) | 컴포넌트들이 함께 쓰는 열거형, 구조체, 상태 코드 타입과 상수를 정의한다 | 없음 | ASIL B | IF-004 | 없음 | SWR-028, SWR-029, SWR-032, SWR-037, SWR-038, SWR-041, SWR-042, SWR-043, SWR-047 |
+| CMP-005 | status_view (`src/status_view/`) | 조회 결과를 널 종료 JSON 문자열로 직렬화한다 | 없음 | QM | IF-005 | IF-004 | SWR-014, SWR-015 |
+| CMP-006 | decision_log (`src/decision_log/`) | 제어 결정 이력을 최근 100건까지 보존하고 오래된 것부터 조회하게 한다 | 이력 저장소(링 버퍼, 호출자가 메모리 제공) | QM | IF-006 | IF-004 | SWR-010, SWR-011, SWR-012 |
 
 > ASIL/QM 분리: 이터레이션 1의 모든 컴포넌트가 ASIL B 입력(SAF)을 구현하므로 분리하지 않는다. 이후 이터레이션의 QM 기능(자동 잠금, 운전자 명령 적용, 이력)은 별도 컴포넌트로 두고 `arbiter`의 규칙 5 자리에서 ops 테이블로 연결해 ASIL B 코드와 간섭을 막는다.
 > 코딩 제약(SWR-028, 029, 032, 037, 038, 041, 042, 043, 047)은 모든 컴포넌트에 적용되며 `common`에 대표로 연결한다(검증은 `tools/run.sh`의 build, rules).
@@ -41,14 +43,16 @@ flowchart TD
 |---|---|---|---|---|---|---|---|
 | IF-001 | `input_guard_if.h` | CMP-001 | CMP-003 | `status_t input_guard_init(input_guard_t *guard)`, `status_t input_guard_update(input_guard_t *guard, uint32_t now_ms, const raw_snapshot_t *snapshot, normalized_inputs_t *out)`, `status_t input_guard_check_command(const raw_command_t *command, checked_command_t *out)` | 초기화 1회, update는 평가마다 정확히 1회(snapshot은 없으면 NULL), check_command는 명령이 있는 평가에서만 update 뒤에 호출 | 포인터 NULL → STATUS_ERR_PARAM (출력 불변). snapshot이 NULL인 것은 오류가 아님 | SWR-013, SWR-022, SWR-033, SWR-046 |
 | IF-002 | `arbiter_if.h` | CMP-002 | CMP-003 | `status_t arbiter_decide(const arbiter_input_t *input, decision_t *out)` | 평가마다 1회, input_guard_update와 명령 검사 뒤 | 포인터 NULL, 입력 구조체 안의 NULL 포인터, 범위 밖 열거값(직전 출력) → STATUS_ERR_PARAM (출력 불변) | SWR-001, SWR-002, SWR-003, SWR-005, SWR-006, SWR-007, SWR-008, SWR-009, SWR-017, SWR-018, SWR-020, SWR-021, SWR-023, SWR-024, SWR-034, SWR-035, SWR-036, SWR-048 |
-| IF-003 | `lock_ctrl_if.h` | CMP-003 | 호출자(범위 밖) | `status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config)`, `status_t lock_ctrl_evaluate(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input, lock_ctrl_result_t *result)`, `status_t lock_ctrl_get_result(const lock_ctrl_t *ctrl, lock_ctrl_result_t *result)` | init 1회 후 evaluate를 10 ms 주기로 호출. get_result는 언제든 | NULL → STATUS_ERR_PARAM (config가 NULL인 init은 오류가 아니며 기본 초기 출력 RELEASE). now_ms가 직전에 받아들여진 평가보다 작으면 STATUS_ERR_TIME (상태 불변) | SWR-025, SWR-026, SWR-027, SWR-031, SWR-039, SWR-040, SWR-044, SWR-048 |
+| IF-003 | `lock_ctrl_if.h` | CMP-003 | 호출자(범위 밖) | `status_t lock_ctrl_init(lock_ctrl_t *ctrl, const lock_ctrl_config_t *config)`, `status_t lock_ctrl_evaluate(lock_ctrl_t *ctrl, const lock_ctrl_input_t *input, lock_ctrl_result_t *result)`, `status_t lock_ctrl_get_result(const lock_ctrl_t *ctrl, lock_ctrl_result_t *result)`, `status_t lock_ctrl_get_log_count(const lock_ctrl_t *ctrl, uint32_t *count)`, `status_t lock_ctrl_get_log_entry(const lock_ctrl_t *ctrl, uint32_t index, decision_entry_t *entry)` | init 1회 후 evaluate를 10 ms 주기로 호출. get_result는 언제든 | NULL → STATUS_ERR_PARAM (config가 NULL인 init은 오류가 아니며 기본 초기 출력 RELEASE). now_ms가 직전에 받아들여진 평가보다 작으면 STATUS_ERR_TIME (상태 불변) | SWR-025, SWR-026, SWR-027, SWR-031, SWR-039, SWR-040, SWR-004, SWR-010, SWR-014, SWR-044, SWR-048 |
 | IF-004 | `types_if.h` | CMP-004 | CMP-001, CMP-002, CMP-003 | (함수 없음, 타입·상수만) | — | — | SWR-038, SWR-028 |
+| IF-005 | `status_view_if.h` | CMP-005 | 호출자(표시 어댑터, 범위 밖) | `status_t status_view_format(const lock_ctrl_result_t *result, char *buffer, size_t size)` | 상태 조회 뒤 필요할 때 | result, buffer NULL 또는 size 0 → STATUS_ERR_PARAM. 버퍼 부족 → STATUS_ERR_BUFFER(buffer를 빈 문자열로) | SWR-014, SWR-015 |
+| IF-006 | `decision_log_if.h` | CMP-006 | CMP-003 | `status_t decision_log_init(decision_log_t *log)`, `status_t decision_log_append(decision_log_t *log, const decision_entry_t *entry)`, `status_t decision_log_count(const decision_log_t *log, uint32_t *count)`, `status_t decision_log_get(const decision_log_t *log, uint32_t index, decision_entry_t *out)` | init 1회, append는 결정이 바뀐 평가마다, count/get은 조회 때 | NULL → STATUS_ERR_PARAM, index가 건수 이상 → STATUS_ERR_PARAM(출력 불변) | SWR-010, SWR-011, SWR-012 |
 
 ### 3.1 데이터 타입 (`types_if.h`)
 
 | 타입 | 필드/값 | 단위 | 범위 | 분해능 |
 |---|---|---|---|---|
-| `status_t` | STATUS_OK, STATUS_ERR_PARAM, STATUS_ERR_TIME | — | — | — |
+| `status_t` | STATUS_OK, STATUS_ERR_PARAM, STATUS_ERR_TIME, STATUS_ERR_BUFFER | — | — | — |
 | `lock_cmd_t` | LOCK_RELEASE, LOCK_LOCK | — | — | — |
 | `ctrl_state_t` | STATE_NORMAL, STATE_DEGRADED, STATE_FAULT, STATE_OFF | — | — | — |
 | `validity_t` | VALIDITY_VALID, VALIDITY_INVALID, VALIDITY_STALE | — | — | — |
@@ -72,6 +76,8 @@ flowchart TD
 | `lock_outputs_t` | left, right (lock_cmd_t) | — | — | — |
 | `decision_t` | outputs(lock_outputs_t), state, reason, warning, approach(approach_state_t, 새 접근위험 기록) | — | — | — |
 | `lock_ctrl_config_t` | initial_outputs (lock_outputs_t, 시험 지원 SWR-039) | — | — | — |
+| `decision_entry_t` | event_id(uint32_t), now_ms(uint32_t), outputs(lock_outputs_t), state, reason, warning | ms | event_id 1~ | — |
+| `decision_log_t` | entries[100](decision_entry_t), count(0~100), head, next_id. 호출자가 메모리를 제공한다 | — | — | — |
 | `lock_ctrl_result_t` | outputs, state, reason, priority_reason(reason과 같은 값), warning, command_status, input_validity[ITEM_COUNT], override_active[DOOR_COUNT] | — | — | — |
 | `input_guard_t`, `lock_ctrl_t` | 호출자가 메모리를 제공하는 상태 구조체. 필드는 해당 컴포넌트만 읽고 쓴다(동적 할당 없음, SWR-029) | — | — | — |
 
@@ -79,10 +85,12 @@ flowchart TD
 
 | 컴포넌트 | 의존하는 인터페이스 | 방향 | 비고 |
 |---|---|---|---|
-| CMP-003 lock_ctrl | IF-001, IF-002, IF-004 | CMP-003 → CMP-001, CMP-002, CMP-004 | 최상위 컴포넌트 |
+| CMP-003 lock_ctrl | IF-001, IF-002, IF-006, IF-004 | CMP-003 → CMP-001, CMP-002, CMP-004 | 최상위 컴포넌트 |
 | CMP-001 input_guard | IF-004 | CMP-001 → CMP-004 | |
 | CMP-002 arbiter | IF-004 | CMP-002 → CMP-004 | |
 | CMP-004 common | 없음 | — | 타입·상수만 |
+| CMP-005 status_view | IF-004 | CMP-005 → CMP-004 | `lock_ctrl`과 독립(호출자가 조회 결과를 넘긴다) |
+| CMP-006 decision_log | IF-004 | CMP-006 → CMP-004 | |
 
 순환 의존 없음: 의존 방향은 `lock_ctrl → {input_guard, arbiter} → common`이다(2026-11-27, `check_interfaces.py` I4로 구현 단계에서 재확인). `input_guard`와 `arbiter`는 서로를 모르며 `normalized_inputs_t`(공유 타입)로만 데이터를 주고받는다.
 
@@ -90,7 +98,7 @@ flowchart TD
 
 | 디렉터리 | 내용 (타입·상수만) | 사유 |
 |---|---|---|
-| `src/common/` | 열거형, 구조체, 상태 코드, 입력 항목 정의 | 세 컴포넌트가 입출력 데이터 형식을 같게 쓰기 위해. 로직은 넣지 않는다 |
+| `src/common/` | 열거형, 구조체, 상태 코드, 입력 항목 정의, 이력 항목 | 세 컴포넌트가 입출력 데이터 형식을 같게 쓰기 위해. 로직은 넣지 않는다 |
 
 ## 6. HW·OS 경계 (통합 테스트 스텁 지점)
 
@@ -112,7 +120,7 @@ flowchart TD
 | ② | `input_guard_update`: 스냅샷 검사, 입력 항목별 저장 상태 갱신, 입력 상태(INVALID/STALE/VALID) 계산, 정규화 입력 생성 | CMP-001 | NULL 포인터면 STATUS_ERR_PARAM |
 | ③ | 명령이 있으면 `input_guard_check_command`로 검사한 명령(상태, side, action)을 얻고, 없으면 COMMAND_NONE | CMP-001 | |
 | ④ | `arbiter_decide`: 결정 규칙표(전역 규칙 1~8, 문 규칙 9~12, 규칙 13~14)와 state 결정. 직전 확정 출력, 명령, 문별 접근위험 기록을 입력으로 받는다 | CMP-002 | |
-| ⑤ | 직전 확정 출력, 문별 접근위험 기록, 직전 now_ms를 갱신하고 결과를 구성해 호출자에게 낸다 | CMP-003 | |
+| ⑤ | 결과를 구성하고, 직전 결과와 결정이 달라졌으면 `decision_log_append`로 이력에 추가한 뒤, 직전 확정 출력, 문별 접근위험 기록, 직전 now_ms를 갱신하고 호출자에게 낸다 | CMP-003, CMP-006 | |
 
 ### 7.2 결정 규칙 (CMP-002, SWR-023, 소프트웨어 요구사항 5.4절)
 
@@ -178,3 +186,4 @@ flowchart TD
 |---|---|---|---|---|
 | 0.1 | 2026-11-27 | CMP-001, CMP-002, CMP-003, CMP-004, IF-001, IF-002, IF-003, IF-004 | 이터레이션 1 최초 작성 (단계 리뷰는 사용자 지시로 생략) | 없음 |
 | 0.2 | 2026-11-27 | CMP-002, CMP-003, IF-001, IF-002, IF-003 | 이터레이션 2: 문 단위 규칙과 전역 해제 규칙 추가, 접근위험 기록(상태는 lock_ctrl이 소유), 검사한 명령 구조체, 결과에 override 상태 (단계 리뷰는 사용자 지시로 생략) | 상세 설계서 |
+| 0.3 | 2026-11-27 | CMP-005, CMP-006, IF-005, IF-006, CMP-003, IF-003 | 이터레이션 3: 상태 직렬화 컴포넌트, 제어 결정 이력 컴포넌트, lock_ctrl의 이력 조회 인터페이스 (단계 리뷰는 사용자 지시로 생략) | 상세 설계서 |
