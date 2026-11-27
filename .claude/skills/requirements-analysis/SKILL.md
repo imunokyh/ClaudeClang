@@ -11,12 +11,13 @@ description: A-SPICE SWE.1(SW 요구사항 분석) 단계에서 SW 요구사항 
 
 ```
 요구사항
-├── 기능 요구사항 (REQ-F-nnn)      → docs/swe1/software-requirements.md
+├── 기능 요구사항 (REQ-F-nnn 또는 분류=기능)      → docs/swe1/software-requirements.md
+│   (OEM이 SWR-nnn 번호를 정해 준 프로젝트는 SWR-nnn 하나를 쓰고 `분류` 열로 기능/품질/제한/제약을 구분한다. 아래 REQ-F/Q/L/C는 SWR의 분류로 읽는다)
 ├── 기능 안전 요구사항 (SAF-nnn)   → docs/swe1/safety-requirements.md   ← 별도 문서
 └── 비기능 요구사항                → docs/swe1/software-requirements.md
-    ├── 품질 요구사항 (REQ-Q-nnn)  — ISO 25010 특성으로 분류
-    ├── 제한 (REQ-L-nnn)           — 수치로 정해진 한계(자원, 시간, 크기)
-    └── 제약사항 (REQ-C-nnn)       — 설계·구현·개발 방식을 묶는 조건(언어, 표준, 도구, 인터페이스 형식)
+    ├── 품질 요구사항 (REQ-Q-nnn 또는 분류=품질)  — ISO 25010 특성으로 분류
+    ├── 제한 (REQ-L-nnn 또는 분류=제한)         — 수치로 정해진 한계(자원, 시간, 크기)
+    └── 제약사항 (REQ-C-nnn 또는 분류=제약)       — 설계·구현·개발 방식을 묶는 조건(언어, 표준, 도구, 인터페이스 형식)
 ```
 
 | 종류 | 판별 질문 | 예 |
@@ -73,7 +74,7 @@ python3 .claude/skills/requirements-analysis/scripts/trace_check.py --docs docs 
 
 ## 하지 않는 것
 
-- 설계 결정을 요구사항에 쓰지 않는다("컨트롤러 모듈에서 처리한다" 같은 문장은 SWE.2의 몫이다). 단, 제약(REQ-C)은 설계를 묶는 조건이므로 예외다.
+- 설계 결정을 요구사항에 쓰지 않는다("컨트롤러 모듈에서 처리한다" 같은 문장은 SWE.2의 몫이다). 단, 제약(REQ-C 또는 `분류`=제약)은 설계를 묶는 조건이므로 예외다.
 - 검증할 수 없는 요구사항을 합격 기준 없이 두지 않는다.
 
 ## 보고

@@ -4,11 +4,15 @@
 
 ## 프로젝트
 
-ClaudeClang — "AI를 이용한 C 코드". 차량 SW를 A-SPICE 절차에 따라 C로 개발하고, Clang/LLVM 툴체인으로 빌드·검증한다. 과제 요구사항이 정해지면 이 절에 과제 이름과 입력 문서 위치를 추가한다.
+ClaudeClang — "AI를 이용한 C 코드". 차량 SW를 A-SPICE 절차에 따라 C로 개발하고, Clang/LLVM 툴체인으로 빌드·검증한다. 
+
+- **과제**: 전자식 차일드락 제어 SW (후석 좌, 우, 가상 OEM-A / 공급자 Volsojoda 입력)
+- **입력 문서**: `OEM/OEM-SWR-001_OEM SW 요구사항 사양서.docx` (Rev 1.0, BL-OEM-1.0). 교육용 가상 문서이며 준수·인증을 주장하지 않는다.
+- **이터레이션 계획**: 이터레이션 1~4. 범위와 진행은 `docs/iterations/`.
 
 ### 사람 개입(Human in the Loop) 설정
 
-- **요청자 이름**: (미설정 — 사용자에게 확인해서 이 줄에 적는다)
+- **요청자 이름**: imunokyh (GitHub 계정명. 사용자가 "알아서 해줘"로 위임해 2026-11-27에 정함. 실명을 알려 주면 바꾼다)
 
 코드 주석의 `AI 작성`의 `요청자`와 사용자 리뷰 기록에 이 이름을 쓴다. 이름을 모르면 지어내지 말고 사용자에게 묻는다.
 
@@ -105,7 +109,7 @@ A-SPICE 단계마다 작성 스킬이 있고, 모든 산출물은 `aspice-stage-
 
 ### 요구사항과 추적성
 
-- **요구사항 분류**: 기능 / 비기능으로 나누고, 기능 안전 요구사항(SAF)은 별도 문서(`safety-requirements.md`)에서 관리한다. 비기능은 품질(REQ-Q, ISO 25010 준수), 제한(REQ-L), 제약사항(REQ-C)으로 나눈다.
+- **요구사항 분류**: 기능 / 비기능으로 나누고, 기능 안전 요구사항(SAF)은 별도 문서(`safety-requirements.md`)에서 관리한다. 비기능은 품질(ISO 25010 준수), 제한, 제약사항으로 나눈다. ID는 OEM이 번호를 정해 준 경우 `SWR-nnn` 하나를 쓰고 `분류` 열(기능/품질/제한/제약)로 구분하며, 그렇지 않으면 `REQ-F/Q/L/C-nnn`을 쓴다.
 - **양방향 추적성**: 모든 요구사항은 아키텍처(CMP/IF) → 상세 설계(MOD/MIF/FN) → 구현(`@trace`) → 단위·통합 테스트(UT/IT)와 양방향으로 연결한다. 단계마다 `trace_check.py`로 검증하고, 요구사항 개정 시 전 구간(`--stage all`)을 다시 검사한다.
 
 ---
@@ -179,6 +183,7 @@ A-SPICE 단계마다 작성 스킬이 있고, 모든 산출물은 `aspice-stage-
 | 컴파일 경고 | 0건 (`-Wall -Wextra -Werror`) | `tools/run.sh build` |
 | 포맷 | 차이 없음 (`.clang-format`) | `tools/run.sh format` |
 | 반환 규칙 | `void` 금지, `return`은 마지막에 한 번, 반환값을 버리지 않음 | `tools/run.sh rules` (RT1~RT4) |
+| 금지 호출 | 동적 메모리 함수, 재귀, 시스템 시계·난수 함수 호출 금지 | `tools/run.sh rules` (B1~B3) |
 | 인터페이스 경유 | 컴포넌트·인터페이스 있는 모듈은 `*_if.h`로만 접근, 순환 의존 없음 | `tools/run.sh rules` (I1~I5) |
 | 테스트 주석 | 모든 테스트에 목적·입력값·절차·예상 출력값 Doxygen 주석과 단언 | `tools/run.sh testdocs` |
 | 추적성 | 요구사항 ↔ 설계 ↔ 코드 ↔ 테스트 양방향 100% | `tools/run.sh trace` |
@@ -257,7 +262,8 @@ docker compose run --rm dev bash              # 컨테이너 셸
 | 명령 | 내용 |
 |---|---|
 | `format` / `build` | clang-format 검사 / Debug 빌드(경고 0건) |
-| `rules` / `hitl` / `hitl-reviewed` | 반환·인터페이스 규칙 / AI 작성·사용자 리뷰 주석 / 모든 함수 사용자 리뷰 완료 |
+| `selftest` | 검사 스크립트(추적성, 금지 호출)의 자체 시험 |
+| `rules` / `hitl` / `hitl-reviewed` | 반환·인터페이스·금지 호출 규칙 / AI 작성·사용자 리뷰 주석 / 모든 함수 사용자 리뷰 완료 |
 | `docs` / `testdocs` | Doxygen 주석 형식 / 테스트 함수 주석·단언·명세 ID 일치 |
 | `static` / `complexity` / `cloc` | Cppcheck / Lizard(순환 복잡도 10, 함수 80줄) / 주석률 |
 | `unit` / `integration` / `tdd` | 단위(MC/DC) / 통합(함수 커버리지) / TDD(별도 보고) |

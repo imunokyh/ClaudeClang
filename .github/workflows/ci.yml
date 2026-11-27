@@ -47,6 +47,7 @@ jobs:
           SH
           chmod +x "$RUNNER_TEMP/gate.sh"
 
+      - { name: 검사 스크립트 자체 시험, if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" selftest' }
       - { name: 포맷,                  if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" format' }
       - { name: 빌드,                  if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" build' }
       - { name: 반환·인터페이스 규칙,   if: '!cancelled()', run: '"$RUNNER_TEMP/gate.sh" rules' }

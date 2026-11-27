@@ -1,6 +1,6 @@
 # 요구사항 문서 양식
 
-ID 접두어: `REQ-F`(기능), `REQ-Q`(품질), `REQ-L`(제한), `REQ-C`(제약), `SAF`(기능 안전). 번호는 3자리(`REQ-F-001`).
+ID 접두어: `REQ-F`(기능), `REQ-Q`(품질), `REQ-L`(제한), `REQ-C`(제약), `SAF`(기능 안전). 번호는 3자리(`REQ-F-001`). OEM이 `SWR-nnn` 번호를 정해 준 프로젝트는 `SWR-nnn` 하나를 쓰고 표에 `분류`(기능/품질/제한/제약) 열을 추가한다.
 
 ## docs/swe1/software-requirements.md
 

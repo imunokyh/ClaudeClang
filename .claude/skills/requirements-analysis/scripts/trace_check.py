@@ -15,7 +15,10 @@ import os
 import re
 import sys
 
-ID_RE = re.compile(r"\b(REQ-[FQLC]|SAF|CMP|IF|MOD|MIF|FN|UT|IT)-(\d{3})\b")
+# 앞에 영문자·숫자·하이픈이 붙은 것(예: 상위 문서 ID OEM-IF-001)은 이 저장소의 ID가 아니므로 무시한다.
+ID_RE = re.compile(r"(?<![\w-])(REQ-[FQLC]|SWR|SAF|CMP|IF|MOD|MIF|FN|UT|IT)-(\d{3})(?!\d)")
+# 범위 표기(SWR-021~025)는 중간 ID를 인식하지 못하므로 금지한다(T13).
+RANGE_RE = re.compile(r"(?<![\w-])(REQ-[FQLC]|SWR|SAF|CMP|IF|MOD|MIF|FN|UT|IT)-\d{3}\s*[~∼–-]\s*\d{3}(?!\d)")
 TRACE_TAG_RE = re.compile(r"@trace\s+((?:FN-\d{3}[\s,]*)+)")
 SAFETY_DOC = "safety-requirements.md"
 
@@ -23,7 +26,7 @@ SAFETY_DOC = "safety-requirements.md"
 STAGES = ["swe1", "swe2", "swe3", "swe3-impl", "swe4", "swe5", "all"]
 
 ## ID 종류 묶음
-REQ = ("REQ-F", "REQ-Q", "REQ-L", "REQ-C", "SAF")
+REQ = ("REQ-F", "REQ-Q", "REQ-L", "REQ-C", "SWR", "SAF")
 ARCH = ("CMP", "IF")
 DESIGN = ("MOD", "MIF", "FN")
 
@@ -90,6 +93,9 @@ def collect_definitions(docs_dir):
                 continue
             path = os.path.join(root, name)
             for number, cells in read_table_rows(path):
+                for cell in cells:
+                    if RANGE_RE.search(cell):
+                        errors.append(f"T13 {path}:{number}: 범위 표기는 쓸 수 없음 (ID를 하나씩 쓸 것): {cell[:40]}")
                 first = ID_RE.fullmatch(cells[0]) if cells else None
                 if not first:
                     continue

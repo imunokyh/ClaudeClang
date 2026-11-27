@@ -6,7 +6,8 @@
 # 명령 (소스 품질 기준과 1:1 대응):
 #   format        clang-format 차이 없음
 #   build         Debug 빌드, 경고 0건 (-Wall -Wextra -Werror)
-#   rules         반환 규칙(RT1~4), 인터페이스 경유 접근(I1~5)
+#   rules         반환 규칙(RT1~4), 인터페이스 경유 접근(I1~5), 금지 호출(B1 동적 메모리, B2 재귀, B3 시계·난수)
+#   selftest      검사 스크립트 자체의 시험 (trace_check, check_banned)
 #   hitl          모든 함수에 AI 작성·사용자 리뷰 Doxygen 주석 (HC1~3)
 #   hitl-reviewed 위에 더해 모든 함수의 사용자 리뷰가 완료됨 (HC4, PR 병합 게이트)
 #   docs          Doxygen 주석 형식 검사 (경고 = 실패)
@@ -110,6 +111,16 @@ cmd_rules() {
     python3 "${SKILL_IMPL}/check_return_rules.py" --src src -- "${CLANG_ARGS[@]}" || status=1
     # shellcheck disable=SC2046
     python3 "${SKILLS}/architecture-design/scripts/check_interfaces.py" --src src $(shared_dir_args) || status=1
+    python3 "${SKILL_IMPL}/check_banned.py" --src src || status=1
+    return "${status}"
+}
+
+# 검사 스크립트 자체의 시험(회귀). 소스가 없어도 실행한다.
+cmd_selftest() {
+    local status=0
+    python3 "${SKILLS}/requirements-analysis/scripts/test_trace_check.py" || status=1
+    python3 "${SKILL_IMPL}/test_check_banned.py" || status=1
+    if [ "${status}" -eq 0 ]; then echo "판정: 통과"; else echo "판정: 실패 — 검사 스크립트 시험 실패"; fi
     return "${status}"
 }
 
@@ -269,13 +280,13 @@ cmd_system() {
 }
 
 cmd_all() {
-    cmd_format && cmd_build && cmd_rules && cmd_hitl && cmd_docs && cmd_testdocs \
+    cmd_selftest && cmd_format && cmd_build && cmd_rules && cmd_hitl && cmd_docs && cmd_testdocs \
         && cmd_static && cmd_complexity && cmd_cloc \
         && cmd_unit && cmd_integration && cmd_tdd && cmd_trace && cmd_system
 }
 
 case "${1:-}" in
-    format | build | rules | hitl | docs | testdocs | static | complexity | cloc | unit | integration | tdd | trace | system | all)
+    format | build | rules | selftest | hitl | docs | testdocs | static | complexity | cloc | unit | integration | tdd | trace | system | all)
         "cmd_$1"
         ;;
     hitl-reviewed) cmd_hitl_reviewed ;;
